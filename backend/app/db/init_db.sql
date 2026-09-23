@@ -1,0 +1,1 @@
+--- Script SQL inicial con pgvector

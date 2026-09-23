@@ -1,0 +1,1 @@
+# Dependencias Python (fastapi, uvicorn, spacy, etc.)
