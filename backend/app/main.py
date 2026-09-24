@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import Base, engine, get_db
@@ -41,6 +42,7 @@ if settings.BACKEND_CORS_ORIGINS:
 
 # Inclusión de las rutas de la versión 1 de la API (/api/v1)
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth")
 
 
 def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:

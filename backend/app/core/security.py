@@ -3,6 +3,7 @@
 # - encriptar y verificar contraseñas con bcrypt,
 # - firmar y decodificar tokens JWT (JSON Web Tokens),
 # - y proveer las dependencias que protegen tus rutas en FastAPI según el rol del usuario.
+## Módulo central de seguridad y autenticación (PluriJob)
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -16,17 +17,15 @@ from app.core.database import get_db
 from app.models.user import User
 
 # Esquema de autenticación Bearer Token de FastAPI.
-# auto_error=False permite controlar el error manualmente si la petición no trae el token en el Header.
 security_scheme = HTTPBearer(auto_error=False)
 
 
-# --- 1. ENCRIPTACIÓN DE CONTRASENAS (Bcrypt) ---
+# --- 1. ENCRIPTACIÓN DE CONTRASEÑAS (Bcrypt Nativo) ---
 
 
 def hash_password(password: str) -> str:
     """
-    Recibe una contraseña en texto plano, genera una sal (salt) aleatoria
-    y retorna la contraseña encriptada (hash) para guardarla de forma segura en la base de datos.
+    Genera un hash seguro utilizando bcrypt directamente.
     """
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
@@ -34,9 +33,10 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, password_hash: str) -> bool:
     """
-    Compara una contraseña ingresada en texto plano con el hash guardado en la base de datos.
-    Retorna True si coinciden, False de lo contrario.
+    Compara la contraseña ingresada en texto plano contra el hash de la DB.
     """
+    if not password_hash:
+        return False
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
@@ -45,38 +45,38 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_access_token(subject: str, expires_delta: timedelta | None = None) -> str:
     """
-    Genera un token JWT firmado.
-    - 'subject' (sub): Por lo general guarda el email o el ID del usuario.
-    - Incluye marca de tiempo de creación ('iat') y fecha de expiración ('exp').
+    Genera un token JWT firmado mediante HS256.
     """
     now = datetime.now(timezone.utc)
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
-        "sub": subject,
+        "sub": str(subject),
         "exp": now + expires_delta,
         "iat": now,
     }
-    # Firma el token usando la clave secreta y el algoritmo (HS256) definidos en .env / config.py
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 def decode_access_token(token: str) -> str:
     """
-    Decodifica y verifica la firma del token JWT.
-    Si el token ha sido alterado, caducó o es inválido, lanza una excepción (ValueError).
+    Decodifica y verifica el token JWT. Retorna el 'sub' (email o ID).
+    Lanza ValueError si el token expiró o es inválido.
     """
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        return payload["sub"]
+        sub: str | None = payload.get("sub")
+        if not sub:
+            raise ValueError("Payload sin campo sub")
+        return sub
     except jwt.PyJWTError as exc:
-        raise ValueError("Token inválido") from exc
+        raise ValueError("Token inválido o expirado") from exc
 
 
-# --- 3. DEPENDENCIAS DE SEGURIDAD PARA RUTAS (FastAPI Guards) ---
+# --- 3. DEPENDENCIAS DE SEGURIDAD Y ROLES (FastAPI Guards) ---
 
 
 def get_current_user(
@@ -84,35 +84,39 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """
-    Dependencia que extrae el token del Header 'Authorization: Bearer <TOKEN>',
-    lo valida, busca el usuario en PostgreSQL y confirma que esté activo.
+    Extrae y valida el token JWT del Header Authorization Bearer.
+    Retorna la instancia de User de PostgreSQL.
     """
-    # 1. Verifica si el cliente envió las credenciales HTTP
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No autorizado",
+            detail="No se proporcionaron credenciales de autenticación",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 2. Decodifica el token para obtener el email
     try:
-        email = decode_access_token(credentials.credentials)
+        identifier = decode_access_token(credentials.credentials)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido",
+            detail="Token de acceso inválido o expirado",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
-    # 3. Busca el usuario en la base de datos
-    user = db.query(User).filter(User.email == email).first()
+    # Busca por email
+    user = db.query(User).filter(User.email == identifier).first()
 
-    # 4. Verifica que el usuario exista y no esté desactivado
+    # Si no lo encuentra por email, intenta buscar por UUID id (si decidieras usar ID como sub)
+    if user is None:
+        try:
+            user = db.query(User).filter(User.id == identifier).first()
+        except Exception:
+            pass
+
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario no válido",
+            detail="Usuario no válido o cuenta inactiva",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -121,13 +125,23 @@ def get_current_user(
 
 def get_current_recruiter(current_user: User = Depends(get_current_user)) -> User:
     """
-    Dependencia adicional para endpoints restringidos.
-    Reutiliza 'get_current_user' y añade la validación de rol:
-    Si el usuario no es 'recruiter', bloquea la petición devolviendo un HTTP 403 (Forbidden).
+    Guardia que restringe el acceso únicamente a usuarios con rol 'recruiter'.
     """
     if current_user.role != "recruiter":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Se requiere rol de reclutador",
+            detail="Se requieren privilegios de reclutador para realizar esta acción",
+        )
+    return current_user
+
+
+def get_current_candidate(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Guardia que restringe el acceso a usuarios postulantes ('registered' o 'casual').
+    """
+    if current_user.role not in ["registered", "casual"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Este recurso es exclusivo para candidatos",
         )
     return current_user
