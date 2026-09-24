@@ -1,5 +1,7 @@
-# Punto de entrada FastAPI
-# Habilita CORS y valida que PostgreSQL + pgvector estén listos para recibir peticiones del frontend.
+# Este es el punto de entrada principal (main.py) de tu aplicación FastAPI en PluriJob.
+# Se encarga de ensamblar las rutas, habilitar la integración CORS,
+# verificar la disponibilidad de PostgreSQL e inicializar la extensión vectorial pgvector
+# junto con las tablas del ORM.
 
 import time
 
@@ -8,14 +10,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.database import engine, get_db
+from app.core.database import Base, engine, get_db
 
+# Se importan explícitamente todos los modelos ORM antes de invocar create_all()
+# para garantizar que SQLAlchemy los registre en los metadatos globales.
+from app.models.application import Application  # noqa: F401
+from app.models.email_template import EmailTemplate  # noqa: F401
+from app.models.job import Job  # noqa: F401
+from app.models.resume import Resume  # noqa: F401
+from app.models.skill_cache import SkillCache  # noqa: F401
+from app.models.user import User  # noqa: F401
+
+# Inicialización de la aplicación FastAPI
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
+# Configuración del middleware de CORS (Cross-Origin Resource Sharing) para comunicación con el Frontend
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
@@ -25,8 +39,15 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+# Inclusión de las rutas de la versión 1 de la API (/api/v1)
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
 
 def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
+    """
+    Realiza reintentos pasivos hasta que el contenedor/instancia de PostgreSQL esté listo.
+    Evita fallos de arranque (race conditions) en entornos como Docker Compose.
+    """
     for attempt in range(1, max_retries + 1):
         try:
             with engine.begin() as conn:
@@ -40,10 +61,17 @@ def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
 
 @app.on_event("startup")
 def startup_event() -> None:
+    """
+    Evento de inicio de la aplicación:
+    1. Espera la disponibilidad de la base de datos.
+    2. Habilita la extensión pgvector ('CREATE EXTENSION IF NOT EXISTS vector').
+    3. Crea las tablas de la base de datos según los modelos registrados en Base.metadata.
+    """
     try:
         wait_for_database()
         with engine.begin() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        Base.metadata.create_all(bind=engine)
     except Exception as exc:
         raise RuntimeError(
             f"No se pudo inicializar PostgreSQL/pgvector: {exc}"
@@ -52,12 +80,16 @@ def startup_event() -> None:
 
 @app.get("/")
 def root():
+    """Ruta raíz de bienvenida e indicación de documentación Swagger/OpenAPI."""
     return {"message": "Bienvenido a la API de PluriJob", "docs": "/docs"}
 
 
 @app.get("/health", tags=["Health Check"])
 def health_check(db: Session = Depends(get_db)):
-    """Verifica que la API y la extensión pgvector estén activas."""
+    """
+    Endpoint de diagnóstico para monitorear la salud del backend y verificar
+    que la extensión pgvector esté instalada y habilitada correctamente.
+    """
     try:
         result = db.execute(
             text(
