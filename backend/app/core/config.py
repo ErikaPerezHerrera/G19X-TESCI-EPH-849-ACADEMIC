@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # El token expira en 8 horas (480 min)
 
     # --- CONFIGURACIÓN DE BASE DE DATOS (PostgreSQL) ---
-    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_SERVER: str = "postgres"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "K1k@k0kA"
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
         data = info.data
         user = quote_plus(str(data.get("POSTGRES_USER", "postgres")))
         password = quote_plus(str(data.get("POSTGRES_PASSWORD", "")))
-        server = str(data.get("POSTGRES_SERVER", "localhost"))
+        server = str(data.get("POSTGRES_SERVER", "postgres"))
         port = str(data.get("POSTGRES_PORT", 5432))
         db = str(data.get("POSTGRES_DB", "PluriJob"))
 
@@ -74,7 +74,7 @@ class Settings(BaseSettings):
             raise ValueError("POSTGRES_SERVER y POSTGRES_DB no pueden estar vacíos")
 
         # Construye la URL final con el conector psycopg2
-        return f"postgresql+psycopg2://{user}:{password}@{server}:{port}/{db}"
+        return f"postgresql+psycopg2://{user}:{password}@{server}:{port}/{db}?sslmode=disable"
 
     # --- CONFIGURACIÓN DE CORS (Política de Orígenes Cruzados) ---
     # Define qué páginas/orígenes frontend tienen permiso para consumir esta API

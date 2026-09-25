@@ -1,21 +1,21 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: plurijob-db
+    container_name: postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: PluriJob
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: K1k@k0kA
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d PluriJob"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 5
 
   backend:
     network_mode: host
@@ -26,8 +26,8 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      POSTGRES_SERVER: localhost
-      POSTGRES_PORT: 5432
+      POSTGRES_SERVER: 127.0.0.1
+      POSTGRES_PORT: 5433
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: K1k@k0kA
       POSTGRES_DB: PluriJob
@@ -39,6 +39,5 @@ services:
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
 volumes:
   postgres_data:

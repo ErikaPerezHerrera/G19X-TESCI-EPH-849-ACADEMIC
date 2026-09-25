@@ -70,12 +70,12 @@ class Application(Base):
 
     # Análisis complementario en formato JSONB generado por la IA (puntos fuertes, recomendaciones)
     ai_analysis = Column(
-        JSONB, nullable=False, default=dict, server_default="'{}'::jsonb"
+        JSONB, nullable=False, default=dict, server_default="{}"
     )
 
     # Desglose explicativo en formato JSONB (coincidencias léxicas, habilidades encontradas/faltantes, score vectorial)
     match_details = Column(
-        JSONB, nullable=False, default=dict, server_default="'{}'::jsonb"
+        JSONB, nullable=False, default=dict, server_default="{}"
     )
 
     # Estado actual de la postulación (ej: 'received', 'under_review', 'shortlisted', 'rejected')
