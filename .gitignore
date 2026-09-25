@@ -1,1 +1,3 @@
 # Exclusión de venv, __pycache__, .env, node_modules
+__pycache__/
+*.py[cod]
