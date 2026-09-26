@@ -1,1 +1,2 @@
-/// URLs base de API (http://localhost:8000/api/v1)
+// frontend/src/js/config.js
+export const API_BASE_URL = "http://localhost:8000/api/v1";
