@@ -28,8 +28,8 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("access_token", data.access_token);
         alert("¡Inicio de sesión exitoso!");
 
-        // Redirigir directamente a la pantalla de publicar vacante
-        window.location.href = "../pages/recruiter/publish.html";
+        // Redirigir directamente a la pantalla de vacantes
+        window.location.href = "../pages/recruiter/jobs.html";
       } else {
         alert(
           `Error al iniciar sesión: ${data.detail || "Credenciales incorrectas"}`,

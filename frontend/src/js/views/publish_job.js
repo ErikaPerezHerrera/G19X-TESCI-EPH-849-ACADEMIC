@@ -58,7 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (response.ok) {
         alert("¡Vacante creada con éxito!");
-        window.location.href = "/src/pages/recruiter/jobs.html";
+        window.location.href = "../recruiter/jobs.html";
       } else {
         // En caso de error 422, data.detail contiene exactamente qué campo falló
         console.error("Detalle del error de validación:", data.detail);
