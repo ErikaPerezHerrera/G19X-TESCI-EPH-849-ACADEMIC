@@ -4,6 +4,7 @@
 from fastapi import Depends
 
 from app.core.security import (
+    get_current_admin as _get_current_admin,
     get_current_candidate as _get_current_candidate,
     get_current_recruiter as _get_current_recruiter,
     get_current_user as _get_current_user,
@@ -25,8 +26,16 @@ def get_current_recruiter_dep(
     user: User = Depends(_get_current_recruiter),
 ) -> User:
     """
-    Protege rutas exclusivas para reclutadores (crear/editar vacantes, evaluar postulantes).
-    Lanza HTTP 403 Forbidden si el rol no es 'recruiter'.
+    Protege rutas exclusivas para reclutadores y administradores.
+    """
+    return user
+
+
+def get_current_admin_dep(
+    user: User = Depends(_get_current_admin),
+) -> User:
+    """
+    Protege rutas exclusivas para administradores.
     """
     return user
 

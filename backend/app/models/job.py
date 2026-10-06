@@ -48,8 +48,8 @@ class Job(Base):
     # Área profesional u departamental (ej: "Tecnología", "Recursos Humanos")
     area = Column(String(100), nullable=False)
 
-    # Tipo o nivel de perfil buscado (ej: "Senior", "Junior", "Líder Técnico")
-    profile_type = Column(String(100), nullable=False)
+    # Perfil académico o profesional requerido para la vacante.
+    profile_type = Column(Text, nullable=False)
 
     # Modality de trabajo (ej: "presencial", "remoto", "híbrido")
     modality = Column(
@@ -70,11 +70,11 @@ class Job(Base):
     # Descripción completa y detallada de la oferta de trabajo
     description = Column(Text, nullable=False)
 
-    # Lista de habilidades obligatorias en formato JSON (ej: ["Python", "FastAPI", "PostgreSQL"])
-    required_skills = Column(JSONB, nullable=False, default=list, server_default="[]")
+    # Lista de habilidades técnicas en formato JSON (ej: ["Python", "FastAPI", "PostgreSQL"])
+    technical_skills = Column(JSONB, nullable=False, default=list, server_default="[]")
 
-    # Lista de habilidades deseables o secundarias en formato JSON (ej: ["Docker", "AWS"])
-    optional_skills = Column(JSONB, nullable=False, default=list, server_default="[]")
+    # Lista de habilidades blandas en formato JSON (ej: ["Comunicación", "Trabajo en equipo"])
+    soft_skills = Column(JSONB, nullable=False, default=list, server_default="[]")
 
     embedding = Column(Vector(384), nullable=True)
 

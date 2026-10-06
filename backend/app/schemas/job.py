@@ -41,11 +41,11 @@ class JobCreate(BaseModel):
         min_length=10,
         description="Descripción detallada del puesto (mínimo 10 caracteres)",
     )
-    required_skills: List[str] = Field(
-        default_factory=list, description="Lista de habilidades indispensables"
+    technical_skills: List[str] = Field(
+        default_factory=list, description="Lista de habilidades técnicas"
     )
-    optional_skills: List[str] = Field(
-        default_factory=list, description="Lista de habilidades deseables/secundarias"
+    soft_skills: List[str] = Field(
+        default_factory=list, description="Lista de habilidades blandas"
     )
     status: Literal["draft", "active", "closed"] = Field(
         "active",
@@ -75,8 +75,8 @@ class JobOut(BaseModel):
     modality: Literal["presencial", "remoto", "hibrido"]
     location: str | None = None
     description: str
-    required_skills: List[str]
-    optional_skills: List[str]
+    technical_skills: List[str]
+    soft_skills: List[str]
     status: Literal["draft", "active", "closed"]
     deadline: Optional[datetime] = None
 

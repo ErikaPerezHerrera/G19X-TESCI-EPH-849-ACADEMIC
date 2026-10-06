@@ -79,20 +79,15 @@ def decode_access_token(token: str) -> str:
 # --- 3. DEPENDENCIAS DE SEGURIDAD Y ROLES (FastAPI Guards) ---
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
     db: Session = Depends(get_db),
-) -> User:
+) -> User | None:
     """
-    Extrae y valida el token JWT del Header Authorization Bearer.
-    Retorna la instancia de User de PostgreSQL.
+    Devuelve el usuario autenticado cuando se envía un token, o None para visitas anónimas.
     """
     if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No se proporcionaron credenciales de autenticación",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return None
 
     try:
         identifier = decode_access_token(credentials.credentials)
@@ -123,14 +118,38 @@ def get_current_user(
     return user
 
 
-def get_current_recruiter(current_user: User = Depends(get_current_user)) -> User:
+def get_current_user(
+    current_user: User | None = Depends(get_optional_current_user),
+) -> User:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No se proporcionaron credenciales de autenticación",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return current_user
+
+
+def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     """
-    Guardia que restringe el acceso únicamente a usuarios con rol 'recruiter'.
+    Guardia que restringe el acceso únicamente a administradores.
     """
-    if current_user.role != "recruiter":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Se requieren privilegios de reclutador para realizar esta acción",
+            detail="Se requieren privilegios de administrador para realizar esta acción",
+        )
+    return current_user
+
+
+def get_current_recruiter(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Guardia que permite acceso a reclutadores y administradores.
+    """
+    if current_user.role not in ("recruiter", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren privilegios de reclutador o administrador para realizar esta acción",
         )
     return current_user
 

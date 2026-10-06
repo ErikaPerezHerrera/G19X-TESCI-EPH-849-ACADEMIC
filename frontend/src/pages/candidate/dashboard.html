@@ -1,1 +1,208 @@
-# Vacantes Aplicadas (Abiertas/Cerradas)
+<!-- Dashboard para Candidatos Registrados -->
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PluriJob - Panel de Candidato</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <script type="module" src="../../js/auth.js"></script>
+  <script src="../../js/guard.js"></script>
+</head>
+<body class="bg-light">
+
+  <!-- Navbar principal -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+      <a class="navbar-brand fw-bold" href="../">PluriJob</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto align-items-center gap-2">
+          <li class="nav-item">
+            <a class="nav-link" href="../index.html"><i class="bi bi-briefcase"></i> Buscar Vacantes</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="dashboard.html"><i class="bi bi-person-workspace"></i> Mis Postulaciones</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="cv_profile.html"><i class="bi bi-file-earmark-person"></i> Mi CV / Perfil</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="settings.html"><i class="bi bi-gear"></i> Configuración</a>
+          </li>
+          <li class="nav-item ms-lg-2">
+            <button class="btn btn-outline-danger btn-sm" id="logoutBtn">
+              <i class="bi bi-box-arrow-right"></i> Salir
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Encabezado de Bienvenida -->
+  <div class="bg-white border-bottom py-4 mb-4 shadow-sm">
+    <div class="container">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2 class="fw-bold mb-1" id="candidateNameGreeting">Bienvenido Candidate</h2>
+          <p class="text-muted mb-0">Gestiona tus aplicaciones y mantén tu perfil profesional actualizado.</p>
+        </div>
+        <div>
+          <a href="cv_profile.html" class="btn btn-primary">
+            <i class="bi bi-file-earmark-arrow-up"></i> Actualizar Mi CV
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido Principal -->
+  <div class="container mb-5">
+    <!-- Tarjetas de Resumen -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body d-flex align-items-center">
+            <div class="bg-primary text-white rounded p-3 me-3">
+              <i class="bi bi-send fs-3"></i>
+            </div>
+            <div>
+              <h6 class="text-muted mb-0">Postulaciones Activas</h6>
+              <h3 class="fw-bold mb-0" id="statApplications">0</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body d-flex align-items-center">
+            <div class="bg-success text-white rounded p-3 me-3">
+              <i class="bi bi-graph-up-arrow fs-3"></i>
+            </div>
+            <div>
+              <h6 class="text-muted mb-0">Match Promedio</h6>
+              <h3 class="fw-bold mb-0" id="statAvgMatch">0%</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body d-flex align-items-center">
+            <div class="bg-info text-white rounded p-3 me-3">
+              <i class="bi bi-file-earmark-check fs-3"></i>
+            </div>
+            <div>
+              <h6 class="text-muted mb-0">Estado del CV</h6>
+              <span class="badge bg-success" id="statCvStatus">Cargado</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de Postulaciones -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white py-3">
+        <h5 class="fw-bold mb-0"><i class="bi bi-journal-text me-2"></i>Historial de Postulaciones</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Vacante</th>
+                <th>Fecha de Postulación</th>
+                <th>Match %</th>
+                <th>Estado</th>
+                <th class="text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="applicationsTableBody">
+              <tr>
+                <td colspan="5" class="text-center py-4 text-muted">
+                  <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                  Cargando postulaciones...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Detalle de la Vacante -->
+  <div class="modal fade" id="jobDetailModal" tabindex="-1" aria-labelledby="jobDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold" id="jobDetailModalLabel">
+            <i class="bi bi-briefcase-fill me-2"></i><span id="modalJobTitle">Detalle de la Vacante</span>
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <!-- Metadatos de la Vacante -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <strong>Área / Departamento:</strong>
+              <p class="text-muted mb-0" id="modalJobArea">-</p>
+            </div>
+            <div class="col-md-6">
+              <strong>Tipo de Perfil:</strong>
+              <p class="text-muted mb-0" id="modalProfileType">-</p>
+            </div>
+            <div class="col-md-6">
+              <strong>Modalidad:</strong>
+              <p class="text-muted mb-0" id="modalJobModality">-</p>
+            </div>
+            <div class="col-md-6">
+              <strong>Ubicación:</strong>
+              <p class="text-muted mb-0" id="modalJobLocation">-</p>
+            </div>
+          </div>
+
+          <hr>
+
+          <!-- Descripción -->
+          <div class="mb-3">
+            <h6 class="fw-bold">Descripción del Puesto</h6>
+            <p class="text-secondary" id="modalJobDescription" style="white-space: pre-line;">-</p>
+          </div>
+
+          <hr>
+
+          <!-- Habilidades -->
+          <div class="mb-3">
+            <h6 class="fw-bold">Habilidades Técnicas</h6>
+            <div id="modalTechnicalSkills" class="d-flex flex-wrap gap-1"></div>
+          </div>
+
+          <div class="mb-3">
+            <h6 class="fw-bold">Habilidades Blandas</h6>
+            <div id="modalSoftSkills" class="d-flex flex-wrap gap-1"></div>
+          </div>
+
+          <hr>
+
+          <div class="d-flex justify-content-between text-muted fs-7">
+            <small><strong>Fecha Límite:</strong> <span id="modalJobDeadline">Sin límite</span></small>
+            <small><strong>Fecha de Postulación:</strong> <span id="modalAppliedAt">-</span></small>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="../../js/views/dashboard_candidate.js"></script>
+</body>
+</html>

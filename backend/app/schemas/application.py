@@ -1,10 +1,12 @@
-# Este archivo define la capa de Esquemas Pydantic para las Postulaciones (Application).
-# Se encarga de validar los datos recibidos al crear una postulación y
-# de estructurar la respuesta enviada al cliente, incluyendo el desglose de matching y el análisis de la IA.
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
+
+# IMPORTANTE: Importa los esquemas relacionados
+from app.schemas.job import JobOut
+from app.schemas.resume import ResumeOut  # <-- Importado para serializar app.resume en la tarjeta del candidato
+
 
 # ==========================================
 # ESQUEMAS DE ENTRADA (SOLICITUDES / REQUESTS)
@@ -32,6 +34,17 @@ class ApplicationCreate(BaseModel):
         ge=0,
         le=100,
         description="Puntuación inicial calculada antes de persistir",
+    )
+
+
+class ApplicationReject(BaseModel):
+    """
+    Esquema para recibir el motivo del descarte por parte del reclutador.
+    """
+
+    rejection_reason: str | None = Field(
+        None,
+        description="Motivo opcional del descarte especificado por el reclutador",
     )
 
 
@@ -69,8 +82,14 @@ class ApplicationOut(BaseModel):
         default_factory=dict,
         description="Desglose explicativo de la puntuación (skills, vectores)",
     )
-    rejection_reason: str | None = None
+    rejection_reason: str | None = Field(
+        None, description="Razón del descarte explicada por el reclutador"
+    )
+
+    # Relaciones para serializar los objetos anidados requeridos en el Dashboard
+    job: JobOut | None = None
+    resume: ResumeOut | None = None  # <-- AGREGADO: Permite que app.resume cargue en createCandidateCard
 
     class Config:
-        # En Pydantic v2 permite mapear directamente desde el objeto ORM de SQLAlchemy (db_application)
+        # En Pydantic v2 permite mapear directamente desde el objeto ORM de SQLAlchemy
         from_attributes = True

@@ -24,6 +24,8 @@ from app.models.resume import Resume  # noqa: F401
 from app.models.skill_cache import SkillCache  # noqa: F401
 from app.models.user import User  # noqa: F401
 
+from app.api.v1.endpoints import applications
+
 # Inicialización de la aplicación FastAPI
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -43,6 +45,7 @@ if settings.BACKEND_CORS_ORIGINS:
 # Inclusión de las rutas de la versión 1 de la API (/api/v1)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth")
+app.include_router(applications.router, prefix="/api/v1", tags=["applications"])
 
 
 def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
