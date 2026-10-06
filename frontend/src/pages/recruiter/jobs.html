@@ -1,5 +1,4 @@
- <!--Vacantes activas y lista de candidatos ordenados-->
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es" data-bs-theme="light">
 <head>
   <meta charset="UTF-8">
@@ -18,6 +17,9 @@
         <a href="publish.html" class="btn btn-primary">
           <i class="bi bi-plus-lg"></i> Publicar Vacante
         </a>
+        <button id="createRecruiterBtn" class="btn btn-outline-light btn-sm d-none">
+          <i class="bi bi-person-plus"></i> Crear Reclutador
+        </button>
         <button id="logoutBtn" class="btn btn-outline-light btn-sm">
           <i class="bi bi-box-arrow-right"></i> Salir
         </button>
@@ -27,64 +29,133 @@
 
   <!-- Contenido Principal -->
   <div class="container my-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h2>Gestión de Vacantes</h2>
-    </div>
 
-    <!-- Pestañas: Activas / Cerradas -->
-    <ul class="nav nav-tabs mb-4" id="jobsTabs" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="active-tab" data-bs-toggle="tab" data-bs-target="#active-jobs" type="button" role="tab">
-          Vacantes Activas
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="closed-tab" data-bs-toggle="tab" data-bs-target="#closed-jobs" type="button" role="tab">
-          Vacantes Cerradas
-        </button>
-      </li>
-    </ul>
+    <!-- VISTA 1: LISTA DE VACANTES CON PESTAÑAS -->
+    <section id="jobsSection">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Gestión de Vacantes</h2>
+      </div>
 
-    <div class="tab-content" id="jobsTabsContent">
-      <!-- Contenedor Vacantes Activas -->
-      <div class="tab-pane fade show active" id="active-jobs" role="tabpanel">
-        <div id="activeJobsList" class="row g-3">
-          <div class="text-center py-5">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p class="mt-2 text-muted">Cargando vacantes...</p>
+      <!-- Pestañas: Activas / Cerradas -->
+      <ul class="nav nav-tabs mb-4" id="jobsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="active-tab" data-bs-toggle="tab" data-bs-target="#active-jobs" type="button" role="tab">
+            Vacantes Activas
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="closed-tab" data-bs-toggle="tab" data-bs-target="#closed-jobs" type="button" role="tab">
+            Vacantes Cerradas
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="jobsTabsContent">
+        <!-- Contenedor Vacantes Activas -->
+        <div class="tab-pane fade show active" id="active-jobs" role="tabpanel">
+          <div id="activeJobsList" class="row g-3">
+            <div class="text-center py-5">
+              <div class="spinner-border text-primary" role="status"></div>
+              <p class="mt-2 text-muted">Cargando vacantes...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contenedor Vacantes Cerradas -->
+        <div class="tab-pane fade" id="closed-jobs" role="tabpanel">
+          <div id="closedJobsList" class="row g-3">
+            <div class="text-center py-5">
+              <p class="text-muted">No hay vacantes cerradas.</p>
+            </div>
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- Contenedor Vacantes Cerradas -->
-      <div class="tab-pane fade" id="closed-jobs" role="tabpanel">
-        <div id="closedJobsList" class="row g-3">
-          <div class="text-center py-5">
-            <p class="text-muted">No hay vacantes cerradas.</p>
+    <!-- VISTA 2: SECCIÓN DE CANDIDATOS POSTULADOS (Oculta por defecto) -->
+    <section id="candidatesSection" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <button class="btn btn-outline-secondary btn-sm mb-2" id="backToJobsBtn">
+            <i class="bi bi-arrow-left"></i> Volver a Vacantes
+          </button>
+          <h2 id="selectedJobTitle" class="mb-0">Candidatos Postulados</h2>
+        </div>
+      </div>
+
+      <!-- Lista de candidatos desplegada directo en la página -->
+      <div id="candidatesList" class="d-flex flex-column gap-3">
+        <!-- Se llena dinámicamente con JS -->
+      </div>
+    </section>
+
+  </div>
+    <!-- Modal para Detalle de la Vacante -->
+  <div class="modal fade" id="jobDetailModal" tabindex="-1" aria-labelledby="jobDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold" id="jobDetailModalLabel">
+            <i class="bi bi-briefcase-fill me-2"></i><span id="modalJobTitle">Detalle de la Vacante</span>
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <!-- Metadatos de la Vacante -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <strong>Área / Departamento:</strong>
+              <p class="text-muted mb-0" id="modalJobArea">-</p>
+            </div>
+            <div class="col-md-6">
+              <strong>Tipo de Perfil:</strong>
+              <p class="text-muted mb-0" id="modalProfileType">-</p>
+            </div>
+            <div class="col-md-6">
+              <strong>Modalidad:</strong>
+              <p class="text-muted mb-0" id="modalJobModality">-</p>
+            </div>
+            <div class="col-md-6">
+              <strong>Ubicación:</strong>
+              <p class="text-muted mb-0" id="modalJobLocation">-</p>
+            </div>
           </div>
+
+          <hr>
+
+          <!-- Descripción -->
+          <div class="mb-3">
+            <h6 class="fw-bold">Descripción del Puesto</h6>
+            <p class="text-secondary" id="modalJobDescription" style="white-space: pre-line;">-</p>
+          </div>
+
+          <hr>
+
+          <!-- Habilidades -->
+          <div class="mb-3">
+            <h6 class="fw-bold">Habilidades Técnicas</h6>
+            <div id="modalTechnicalSkills" class="d-flex flex-wrap gap-1"></div>
+          </div>
+
+          <div class="mb-3">
+            <h6 class="fw-bold">Habilidades Blandas</h6>
+            <div id="modalSoftSkills" class="d-flex flex-wrap gap-1"></div>
+          </div>
+
+          <hr>
+
+          <div class="d-flex justify-content-between text-muted fs-7">
+            <small><strong>Fecha Límite:</strong> <span id="modalJobDeadline">Sin límite</span></small>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Candidatos de una Vacante -->
-  <div class="modal fade" id="candidatesModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="candidatesModalTitle">Candidatos Postulados</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body bg-light">
-          <div id="candidatesList" class="d-flex flex-column gap-3">
-            <!-- Se llena dinámicamente con JS -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Detalle del CV del Candidato -->
+  <!-- ÚNICO MODAL DEL SISTEMA: Detalle del CV del Candidato -->
   <div class="modal fade" id="cvDetailModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
@@ -99,7 +170,38 @@
     </div>
   </div>
 
+  <div class="modal fade" id="createRecruiterModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Crear reclutador</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="createRecruiterForm">
+            <div class="mb-3">
+              <label for="newRecruiterName" class="form-label">Nombre completo</label>
+              <input type="text" class="form-control" id="newRecruiterName" required>
+            </div>
+            <div class="mb-3">
+              <label for="newRecruiterEmail" class="form-label">Correo electrónico</label>
+              <input type="email" class="form-control" id="newRecruiterEmail" required>
+            </div>
+            <div class="mb-3">
+              <label for="newRecruiterPassword" class="form-label">Contraseña</label>
+              <input type="password" class="form-control" id="newRecruiterPassword" minlength="6" required>
+            </div>
+            <div id="recruiterCreateError" class="alert alert-danger d-none"></div>
+            <button type="submit" class="btn btn-primary w-100">Guardar reclutador</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="../../js/auth.js"></script>
+  <script src="../../js/guard.js"></script>
   <script type="module" src="../../js/views/dashboard_recruiter.js"></script>
-</body>u
+</body>
 </html>

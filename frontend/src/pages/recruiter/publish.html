@@ -14,7 +14,7 @@
   <!-- Navegación Superior -->
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
-      <a class="navbar-brand fw-bold" href="#">PluriJob</a>
+      <a class="navbar-brand fw-bold" href="jobs.html">PluriJob</a>
       <span class="navbar-text text-light">Panel de Reclutador</span>
     </div>
   </nav>
@@ -23,6 +23,14 @@
   <div class="container pb-5">
     <div class="row justify-content-center">
       <div class="col-lg-8">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <a href="jobs.html" class="btn btn-outline-secondary">
+          <i class="bi"></i> Volver a vacantes
+        </a>
+        </div>
+        </div>
         
         <div class="card shadow-sm border-0">
           <div class="card-header bg-primary text-white py-3">
@@ -77,17 +85,17 @@
                 <textarea class="form-control" id="jobDescription" rows="5" placeholder="Detalla las responsabilidades principales, misión del rol y propuesta de valor..." required></textarea>
               </div>
 
-              <!-- Habilidades Requeridas -->
+              <!-- Habilidades Técnicas -->
               <div class="mb-3">
-                <label for="requiredSkills" class="form-label fw-semibold">Habilidades Indispensables (Separadas por coma) *</label>
-                <input type="text" class="form-control" id="requiredSkills" placeholder="Ej. Python, FastAPI, PostgreSQL, Git" required>
+                <label for="technicalSkills" class="form-label fw-semibold">Habilidades Técnicas (Separadas por coma) *</label>
+                <input type="text" class="form-control" id="technicalSkills" placeholder="Ej. Python, FastAPI, PostgreSQL, Git" required>
                 <div class="form-text">La IA usará estas habilidades para calcular el porcentaje de compatibilidad con los candidatos.</div>
               </div>
 
-              <!-- Habilidades Opcionales -->
+              <!-- Habilidades Blandas -->
               <div class="mb-3">
-                <label for="optionalSkills" class="form-label fw-semibold">Habilidades Deseables / Opcionales (Separadas por coma)</label>
-                <input type="text" class="form-control" id="optionalSkills" placeholder="Ej. Docker, AWS, Redis">
+                <label for="softSkills" class="form-label fw-semibold">Habilidades Blandas (Separadas por coma) *</label>
+                <input type="text" class="form-control" id="softSkills" placeholder="Ej. Responsabilidad, Comunicación, Trabajo en equipo" required>
               </div>
 
               <!-- Fecha Límite -->
@@ -116,6 +124,8 @@
 
   <!-- JS de Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="../../js/auth.js"></script>
+  <script src="../../js/guard.js"></script>
   <!-- Controlador JavaScript de la vista -->
   <script type="module" src="../../js/views/publish_job.js"></script>
 </body>

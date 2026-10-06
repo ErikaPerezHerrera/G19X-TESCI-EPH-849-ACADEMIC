@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Captura segura de valores
     const deadlineVal = document.getElementById("jobDeadline").value;
-    const optionalVal = document.getElementById("optionalSkills").value;
+    const optionalVal = document.getElementById("softSkills").value;
 
     const payload = {
       title: document.getElementById("jobTitle").value,
@@ -26,13 +26,13 @@ document.addEventListener("DOMContentLoaded", () => {
       modality: document.getElementById("jobModality").value,
       location: document.getElementById("jobLocation").value || null,
       description: document.getElementById("jobDescription").value,
-      required_skills: document
-        .getElementById("requiredSkills")
+      technical_skills: document
+        .getElementById("technicalSkills")
         .value.split(",")
         .map((s) => s.trim())
         .filter(Boolean),
       // Si está vacío, debe ser un arreglo vacío []
-      optional_skills: optionalVal
+      soft_skills: optionalVal
         ? optionalVal
             .split(",")
             .map((s) => s.trim())
@@ -44,8 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     try {
-      // Nótese la barra diagonal final al final de /jobs/
-      const response = await fetch(`${API_BASE_URL}/jobs/`, {
+      const response = await fetch(`${API_BASE_URL}/jobs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
