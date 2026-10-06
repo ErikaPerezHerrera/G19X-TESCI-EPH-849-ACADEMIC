@@ -1,1 +1,156 @@
-# Configuración de cuenta y tema
+<!-- Ajustes de Preferencias e Interfaz -->
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PluriJob - Configuración</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <script type="module" src="../../js/auth.js"></script>
+  <script src="../../js/guard.js"></script>
+</head>
+<body class="bg-light">
+
+  <!-- Navbar principal -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+      <a class="navbar-brand fw-bold" href="../../index.html">PluriJob</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto align-items-center gap-2">
+          <li class="nav-item">
+            <a class="nav-link" href="../index.html"><i class="bi bi-briefcase"></i> Buscar Vacantes</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="dashboard.html"><i class="bi bi-person-workspace"></i> Mis Postulaciones</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="cv_profile.html"><i class="bi bi-file-earmark-person"></i> Mi CV / Perfil</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="settings.html"><i class="bi bi-gear"></i> Configuración</a>
+          </li>
+          <li class="nav-item ms-lg-2">
+            <button class="btn btn-outline-danger btn-sm" id="logoutBtn">
+              <i class="bi bi-box-arrow-right"></i> Salir
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container my-5" style="max-width: 800px;">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white py-3">
+        <h4 class="fw-bold mb-0"><i class="bi bi-sliders me-2"></i>Configuración de Apariencia</h4>
+      </div>
+      <div class="card-body">
+        
+        <!-- Selección de Tema -->
+        <div class="mb-4">
+          <label class="form-label fw-bold mb-2">Tema de la aplicación</label>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="form-check card p-3 border text-center h-100">
+                <input class="form-check-input mx-auto mb-2" type="radio" name="themeRadio" id="themeLight" value="light">
+                <label class="form-check-label w-100" for="themeLight">
+                  <i class="bi bi-sun fs-2 d-block text-warning mb-1"></i>
+                  Claro
+                </label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check card p-3 border text-center h-100">
+                <input class="form-check-input mx-auto mb-2" type="radio" name="themeRadio" id="themeDark" value="dark">
+                <label class="form-check-label w-100" for="themeDark">
+                  <i class="bi bi-moon-stars fs-2 d-block text-primary mb-1"></i>
+                  Oscuro
+                </label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check card p-3 border text-center h-100">
+                <input class="form-check-input mx-auto mb-2" type="radio" name="themeRadio" id="themeAuto" value="auto">
+                <label class="form-check-label w-100" for="themeAuto">
+                  <i class="bi bi-display fs-2 d-block text-secondary mb-1"></i>
+                  Sistema
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr>
+
+        <!-- Tamaños de Letra -->
+        <div class="mb-4">
+          <label for="fontSizeSelect" class="form-label fw-bold">Tamaño de Fuente Global</label>
+          <select class="form-select" id="fontSizeSelect">
+            <option value="small">Pequeño (14px)</option>
+            <option value="medium" selected>Normal (16px)</option>
+            <option value="large">Grande (18px)</option>
+          </select>
+        </div>
+
+        <div class="d-flex justify-content-end">
+          <button type="button" class="btn btn-primary" id="saveSettingsBtn">
+            <i class="bi bi-check-lg"></i> Guardar Preferencias
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module">
+    // Lógica para persisitir y aplicar Tema y Tamaño de Letra
+    document.addEventListener("DOMContentLoaded", () => {
+      const savedTheme = localStorage.getItem("app_theme") || "light";
+      const savedFontSize = localStorage.getItem("app_font_size") || "medium";
+
+      // Marcar radio correspondiente
+      const radio = document.querySelector(`input[name="themeRadio"][value="${savedTheme}"]`);
+      if (radio) radio.checked = true;
+
+      // Seleccionar fuente
+      document.getElementById("fontSizeSelect").value = savedFontSize;
+
+      // Aplicar estilos
+      applyTheme(savedTheme);
+      applyFontSize(savedFontSize);
+    });
+
+    document.getElementById("saveSettingsBtn").addEventListener("click", () => {
+      const selectedTheme = document.querySelector('input[name="themeRadio"]:checked')?.value || "light";
+      const selectedFontSize = document.getElementById("fontSizeSelect").value;
+
+      localStorage.setItem("app_theme", selectedTheme);
+      localStorage.setItem("app_font_size", selectedFontSize);
+
+      applyTheme(selectedTheme);
+      applyFontSize(selectedFontSize);
+
+      alert("Preferencias guardadas correctamente.");
+    });
+
+    function applyTheme(theme) {
+      if (theme === "auto") {
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.setAttribute("data-bs-theme", prefersDark ? "dark" : "light");
+      } else {
+        document.documentElement.setAttribute("data-bs-theme", theme);
+      }
+    }
+
+    function applyFontSize(size) {
+      const sizes = { small: "14px", medium: "16px", large: "18px" };
+      document.documentElement.style.fontSize = sizes[size] || "16px";
+    }
+  </script>
+</body>
+</html>

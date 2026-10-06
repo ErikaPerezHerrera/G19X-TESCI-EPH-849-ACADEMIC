@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PluriJob - Crear Cuenta</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+</head>
+<body class="bg-light d-flex align-items-center vh-100 py-5">
+
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-5">
+        
+        <div class="card shadow-sm border-0">
+          <div class="card-body p-4 text-center">
+            <h3 class="fw-bold text-primary mb-1">PluriJob</h3>
+            <p class="text-muted small mb-4">El primer usuario registrado queda como administrador. Los reclutadores se gestionan desde el panel administrativo.</p>
+
+            <form id="signupForm">
+              <div class="text-start mb-3">
+                <label for="signupName" class="form-label fw-semibold">Nombre Completo</label>
+                <input type="text" class="form-control" id="signupName" placeholder="Juan Pérez" required>
+              </div>
+
+              <div class="text-start mb-3">
+                <label for="signupEmail" class="form-label fw-semibold">Correo Electrónico</label>
+                <input type="email" class="form-control" id="signupEmail" placeholder="usuario@ejemplo.com" required>
+              </div>
+
+              <div class="text-start mb-4">
+                <label for="signupPassword" class="form-label fw-semibold">Contraseña</label>
+                <input type="password" class="form-control" id="signupPassword" placeholder="••••••••" minlength="6" required>
+              </div>
+
+              <button type="submit" class="btn btn-success w-100 py-2 fw-semibold mb-3">
+                <i class="bi bi-person-plus-fill me-2"></i>Registrarme
+              </button>
+            </form>
+
+            <div class="border-top pt-3 text-center small">
+              <span class="text-muted">¿Ya tienes una cuenta?</span>
+              <a href="login.html" class="fw-semibold text-primary text-decoration-none">Inicia sesión</a>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="../js/auth.js"></script>
+</body>
+</html>

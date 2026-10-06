@@ -1,1 +1,157 @@
-# Información extraída y sugerencias IA
+<!-- Gestión de Perfil y CV del Candidato -->
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PluriJob - Mi CV / Perfil</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <script type="module" src="../../js/auth.js"></script>
+  <script src="../../js/guard.js"></script>
+</head>
+<body class="bg-light">
+
+  <!-- Navbar principal -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+      <a class="navbar-brand fw-bold" href="../index.html">PluriJob</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto align-items-center gap-2">
+          <li class="nav-item">
+            <a class="nav-link" href="../index.html"><i class="bi bi-briefcase"></i> Buscar Vacantes</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="dashboard.html"><i class="bi bi-person-workspace"></i> Mis Postulaciones</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="cv_profile.html"><i class="bi bi-file-earmark-person"></i> Mi CV / Perfil</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="settings.html"><i class="bi bi-gear"></i> Configuración</a>
+          </li>
+          <li class="nav-item ms-lg-2">
+            <button class="btn btn-outline-danger btn-sm" id="logoutBtn">
+              <i class="bi bi-box-arrow-right"></i> Salir
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container my-5">
+    <div class="row g-4">
+      
+      <!-- Panel de Carga / Extracción con IA -->
+      <div class="col-lg-4">
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-primary text-white">
+            <h5 class="fw-bold mb-0"><i class="bi bi-file-earmark-pdf me-2"></i>Actualizar mediante PDF</h5>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted">Sube una nueva versión de tu CV en PDF. La IA extraerá los datos automáticamente para rellenar el formulario.</p>
+            
+            <form id="extractCvForm">
+              <div class="mb-3">
+                <label for="cvPdfInput" class="form-label small fw-bold">Archivo PDF</label>
+                <input class="form-control" type="file" id="cvPdfInput" accept="application/pdf" required>
+              </div>
+              <button type="submit" class="btn btn-primary w-100" id="btnExtractCv">
+                <i class="bi bi-cpu"></i> Extraer y Auto-completar
+              </button>
+            </form>
+
+            <div id="extractionProgress" class="text-center py-3 d-none">
+              <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+              <span class="small text-muted ms-2">Analizando CV con IA...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <h6 class="fw-bold mb-2"><i class="bi bi-shield-check text-success me-2"></i>Estado del Perfil</h6>
+            <p class="small text-muted mb-2">Mantener tu CV actualizado mejora la precisión del calculador de compatibilidad.</p>
+            <div class="progress" style="height: 20px;">
+              <div id="profileProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Formulario de Edición de Perfil -->
+      <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0"><i class="bi bi-person-lines-fill me-2"></i>Información del Perfil</h5>
+          </div>
+          <div class="card-body">
+            <form id="profileForm">
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label for="fullName" class="form-label small fw-bold">Nombre Completo</label>
+                  <input type="text" class="form-control" id="fullName" required>
+                </div>
+                <div class="col-md-6">
+                  <label for="email" class="form-label small fw-bold">Correo Electrónico</label>
+                  <input type="email" class="form-control" id="email" required>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label for="phone" class="form-label small fw-bold">Teléfono / WhatsApp</label>
+                  <input type="text" class="form-control" id="phone">
+                </div>
+                <div class="col-md-6">
+                  <label for="currentTitle" class="form-label small fw-bold">Título / Cargo Actual</label>
+                  <input type="text" class="form-control" id="currentTitle" placeholder="Ej: Desarrollador Backend FullStack">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="address" class="form-label small fw-bold">Domicilio</label>
+                <input type="text" class="form-control" id="address" placeholder="Domicilio">
+              </div>
+
+              <div class="mb-3">
+                <label for="techSkills" class="form-label small fw-bold">Habilidades Técnicas (separadas por coma)</label>
+                <input type="text" class="form-control" id="techSkills" placeholder="Python, PostgreSQL, Docker, FastAPI, etc...">
+              </div>
+
+              <div class="mb-3">
+                <label for="softSkills" class="form-label small fw-bold">Habilidades Blandas (separadas por coma)</label>
+                <input type="text" class="form-control" id="softSkills" placeholder="Liderazgo, Trabajo en equipo, Lógica, etc...">
+              </div>
+
+              <div class="mb-3">
+                <label for="experienceSummary" class="form-label small fw-bold">Resumen de Experiencia Laboral</label>
+                <textarea class="form-control" id="experienceSummary" rows="5" placeholder="Resume tu trayectoria..."></textarea>
+              </div>
+
+              <div class="mb-3">
+                <label for="moreInfo" class="form-label small fw-bold">Información Adicional</label>
+                <textarea class="form-control" id="moreInfo" rows="5" placeholder="Agrega cualquier otra información relevante..."></textarea>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2">
+                <button type="submit" class="btn btn-success" id="saveProfileBtn">
+                  <i class="bi bi-floppy"></i> Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="../../js/views/dashboard_candidate.js"></script>
+</body>
+</html>

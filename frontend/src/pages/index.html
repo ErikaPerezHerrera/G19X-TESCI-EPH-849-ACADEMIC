@@ -1,164 +1,305 @@
 <!--# Vista Casual / Landing de Vacantes-->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es" data-bs-theme="light">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PluriJob - Portal de Empleos</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-</head>
-<body class="bg-light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PluriJob - Portal de Empleos</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+    />
+    <script type="module" src="../js/auth.js"></script>
+  </head>
+  <body class="bg-light">
+    <!-- Navbar principal -->
+    <!-- Navbar en index.html -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container">
+        <a class="navbar-brand fw-bold" href="index.html">PluriJob</a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center gap-2">
+            <li class="nav-item">
+              <a class="nav-link active" href="index.html"
+                ><i class="bi bi-briefcase"></i> Vacantes</a
+              >
+            </li>
 
-  <!-- Navbar principal -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container">
-      <a class="navbar-brand fw-bold" href="#">PluriJob</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ms-auto align-items-center gap-2">
-          <li class="nav-item">
-            <a class="nav-link active" href="index.html"><i class="bi bi-briefcase"></i> Ofertas Laborales</a>
-          </li>
-          <li class="nav-item" id="navCandidateDashboard" style="display: none;">
-            <a class="nav-link" href="candidate/dashboard.html"><i class="bi bi-person-workspace"></i> Mis Postulaciones</a>
-          </li>
-          <li class="nav-item" id="navRecruiterDashboard" style="display: none;">
-            <a class="nav-link" href="recruiter/jobs.html"><i class="bi bi-speedometer2"></i> Panel Reclutador</a>
-          </li>
-          <li class="nav-item" id="navAuthSection">
-            <a href="login.html" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión</a>
-          </li>
-        </ul>
+            <!-- Menú exclusivo para candidatos autenticados -->
+            <li class="nav-item d-none" id="navCandidateDashboard">
+              <a class="nav-link" href="candidate/dashboard.html">
+                <i class="bi bi-person-workspace"></i> Mis Postulaciones
+              </a>
+            </li>
+            <li class="nav-item d-none" id="navCandidateProfile">
+              <a class="nav-link" href="candidate/cv_profile.html">
+                <i class="bi bi-file-earmark-person"></i> Mi CV / Perfil
+              </a>
+            </li>
+            <li class="nav-item d-none" id="navCandidateSettings">
+              <a class="nav-link" href="candidate/settings.html">
+                <i class="bi bi-gear"></i> Configuración
+              </a>
+            </li>
+
+            <!-- Botones de Acceso / Salida -->
+            <li class="nav-item" id="navLoginBtn">
+              <a class="btn btn-outline-light btn-sm" href="login.html"
+                >Iniciar Sesión</a
+              >
+            </li>
+            <li class="nav-item d-none" id="navLogoutBtn">
+              <button class="btn btn-outline-danger btn-sm" id="indexLogoutBtn">
+                <i class="bi bi-box-arrow-right"></i> Salir
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
-    </div>
-  </nav>
+    </nav>
 
-  <!-- Hero / Banner de búsqueda -->
-  <div class="bg-primary text-white py-5 mb-4 shadow-sm">
-    <div class="container text-center">
-      <h1 class="display-5 fw-bold">Encuentra tu próximo empleo</h1>
-      <p class="lead">Postúlate al instante subiendo tu CV en formato PDF con inteligencia artificial</p>
-      
-      <!-- Buscador -->
-      <div class="row justify-content-center mt-4">
-        <div class="col-md-8">
-          <div class="input-group input-group-lg shadow-sm">
-            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por cargo, tecnología o área...">
-            <button class="btn btn-dark" type="button" id="searchBtn">
-              <i class="bi bi-search"></i> Buscar
-            </button>
+    <!-- Hero / Banner de búsqueda -->
+    <div class="bg-primary text-white py-5 mb-4 shadow-sm">
+      <div class="container text-center">
+        <h1 class="display-5 fw-bold">Encuentra tu próximo empleo</h1>
+        <p class="lead">
+          Postúlate al instante subiendo tu CV en formato PDF con inteligencia
+          artificial
+        </p>
+
+        <!-- Buscador -->
+        <div class="row justify-content-center mt-4">
+          <div class="col-md-8">
+            <div class="input-group input-group-lg shadow-sm">
+              <input
+                type="text"
+                id="searchInput"
+                class="form-control"
+                placeholder="Buscar por cargo, tecnología o área..."
+              />
+              <button class="btn btn-dark" type="button" id="searchBtn">
+                <i class="bi bi-search"></i> Buscar
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Contenido de Vacantes -->
-  <div class="container mb-5">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h3 class="fw-bold mb-0">Vacantes Disponibles</h3>
-      <span class="badge bg-secondary fs-6" id="jobsCount">0 ofertas</span>
-    </div>
+    <!-- Contenido de Vacantes -->
+    <div class="container mb-5">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="fw-bold mb-0">Vacantes Disponibles</h3>
+        <span class="badge bg-secondary fs-6" id="jobsCount">0 ofertas</span>
+      </div>
 
-    <!-- Lista de Vacantes -->
-    <div class="row g-4" id="jobsContainer">
-      <div class="col-12 text-center py-5">
-        <div class="spinner-border text-primary" role="status"></div>
-        <p class="mt-2 text-muted">Cargando ofertas de empleo...</p>
+      <!-- Lista de Vacantes -->
+      <div class="row g-4" id="jobsContainer">
+        <div class="col-12 text-center py-5">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="mt-2 text-muted">Cargando ofertas de empleo...</p>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Modal: Proceso de Postulación (Subida de CV y Confirmación) -->
-  <div class="modal fade" id="applyModal" tabindex="-1" aria-labelledby="applyModalLabel" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content">
-        
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title" id="applyModalLabel">Postularse a Vacante</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-
-        <div class="modal-body">
-          <h6 class="fw-bold text-primary mb-1" id="modalJobTitle">Nombre del Cargo</h6>
-          <p class="text-muted small mb-3" id="modalJobSubtitle">Área y modalidad</p>
-          <hr>
-
-          <!-- PASO 1: Subir PDF -->
-          <div id="stepUploadCV">
-            <label class="form-label fw-bold">Paso 1: Sube tu Hoja de Vida (PDF)</label>
-            <p class="small text-muted">Extraeremos automáticamente tu experiencia y habilidades para evaluar tu compatibilidad.</p>
-            
-            <div class="mb-3">
-              <input class="form-control" type="file" id="cvFileInput" accept="application/pdf">
-            </div>
-
-            <button type="button" class="btn btn-primary w-100" id="extractCvBtn">
-              <i class="bi bi-cpu"></i> Extraer Datos con IA
-            </button>
+    <!-- Modal: Proceso de Postulación (Subida de CV y Confirmación) -->
+    <div
+      class="modal fade"
+      id="applyModal"
+      tabindex="-1"
+      aria-labelledby="applyModalLabel"
+      aria-hidden="true"
+      data-bs-backdrop="static"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="applyModalLabel">
+              Postularse a Vacante
+            </h5>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
           </div>
 
-          <!-- Spinner de Procesamiento de PDF -->
-          <div id="extractionSpinner" class="text-center py-4 d-none">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p class="mt-2 text-muted mb-0">Analizando el documento PDF y clasificando habilidades...</p>
-          </div>
+          <div class="modal-body">
+            <h6 class="fw-bold text-primary mb-1" id="modalJobTitle">
+              Nombre del Cargo
+            </h6>
+            <p class="text-muted small mb-3" id="modalJobSubtitle">
+              Área y modalidad
+            </p>
+            <hr />
 
-          <!-- PASO 2: Confirmación / Edición de Datos Extraídos -->
-          <form id="stepConfirmCV" class="d-none">
-            <label class="form-label fw-bold text-success">
-              <i class="bi bi-check-circle-fill"></i> Paso 2: Confirma o corrige tu información extraída
-            </label>
-            
-            <div class="mb-3">
-              <label for="candidateFullName" class="form-label small">Nombre Completo</label>
-              <input type="text" class="form-control" id="candidateFullName" required>
-            </div>
+            <!-- PASO 1: Subir PDF -->
+            <div id="stepUploadCV">
+              <label class="form-label fw-bold"
+                >Paso 1: Sube tu Hoja de Vida (PDF)</label
+              >
+              <p class="small text-muted">
+                Extraeremos automáticamente tu experiencia y habilidades para
+                evaluar tu compatibilidad.
+              </p>
 
-            <div class="row g-2 mb-3">
-              <div class="col-md-6">
-                <label for="candidateEmail" class="form-label small">Correo Electrónico</label>
-                <input type="email" class="form-control" id="candidateEmail" required>
+              <div class="mb-3">
+                <input
+                  class="form-control"
+                  type="file"
+                  id="cvFileInput"
+                  accept="application/pdf"
+                />
               </div>
-              <div class="col-md-6">
-                <label for="candidatePhone" class="form-label small">Teléfono / WhatsApp</label>
-                <input type="text" class="form-control" id="candidatePhone">
+
+              <button
+                type="button"
+                class="btn btn-primary w-100"
+                id="extractCvBtn"
+              >
+                <i class="bi bi-cpu"></i> Extraer Datos con IA
+              </button>
+            </div>
+
+            <!-- Spinner de Procesamiento de PDF -->
+            <div id="extractionSpinner" class="text-center py-4 d-none">
+              <div class="spinner-border text-primary" role="status"></div>
+              <p class="mt-2 text-muted mb-0">
+                Analizando el documento PDF y clasificando habilidades...
+              </p>
+            </div>
+
+            <!-- PASO 2: Confirmación / Edición de Datos Extraídos -->
+            <form id="stepConfirmCV" class="d-none">
+              <label class="form-label fw-bold text-success">
+                <i class="bi bi-check-circle-fill"></i> Paso 2: Confirma o
+                corrige tu información extraída
+              </label>
+
+              <div class="mb-3">
+                <label for="candidateFullName" class="form-label small"
+                  >Nombre Completo</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  id="candidateFullName"
+                  required
+                />
               </div>
-            </div>
 
-            <div class="mb-3">
-              <label for="candidateTitle" class="form-label small">Título Profesional / Cargo Actual</label>
-              <input type="text" class="form-control" id="candidateTitle">
-            </div>
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label for="candidateEmail" class="form-label small"
+                    >Correo Electrónico</label
+                  >
+                  <input
+                    type="email"
+                    class="form-control"
+                    id="candidateEmail"
+                    required
+                  />
+                </div>
+                
+                <div class="col-md-6">
+                  <label for="candidatePhone" class="form-label small"
+                    >Teléfono / WhatsApp</label
+                  >
+                  <input type="text" class="form-control" id="candidatePhone" />
+                </div>
+              </div>
+              <div class="mb-3">
+                  <label for="candidateAddress" class="form-label small"
+                    >Dirección</label
+                  >
+                  <input type="text" class="form-control" id="candidateAddress" />
+                </div>
 
-            <div class="mb-3">
-              <label for="candidateSkills" class="form-label small">Habilidades Técnicas (separadas por coma)</label>
-              <input type="text" class="form-control" id="candidateSkills" placeholder="Python, SQL, FastApi...">
-            </div>
+              <div class="mb-3">
+                <label for="candidateTitle" class="form-label small"
+                  >Título Profesional / Cargo Actual</label
+                >
+                <input type="text" class="form-control" id="candidateTitle" />
+              </div>              
 
-            <div class="mb-3">
-              <label for="candidateExperience" class="form-label small">Resumen de Experiencia Laboral</label>
-              <textarea class="form-control" id="candidateExperience" rows="4"></textarea>
-            </div>
+              <div class="mb-3">
+                <label for="candidateSkills" class="form-label small"
+                  >Habilidades Técnicas (separadas por coma)</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  id="candidateSkills"
+                  placeholder="Python, SQL, FastAPI..."
+                />
+              </div>
 
-            <div class="alert alert-info small" role="alert">
-              <i class="bi bi-info-circle"></i> Al confirmar, calcularemos tu porcentaje de compatibilidad (Match %) con esta vacante.
-            </div>
+              <div class="mb-3">
+                <label for="candidateSoftSkills" class="form-label small"
+                  >Habilidades Blandas (separadas por coma)</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  id="candidateSoftSkills"
+                  placeholder="Trabajo en equipo, Liderazgo, Adaptabilidad..."
+                />
+              </div>
 
-            <button type="submit" class="btn btn-success w-100" id="submitApplicationBtn">
-              <i class="bi bi-send-check"></i> Enviar Postulación
-            </button>
-          </form>
+              <div class="mb-3">
+                <label for="candidateExperience" class="form-label small"
+                  >Resumen de Experiencia Laboral</label
+                >
+                <textarea
+                  class="form-control"
+                  id="candidateExperience"
+                  rows="4"
+                ></textarea>
+              </div>
 
+              <div class="mb-3">
+                <label for="candidateMoreInfo" class="form-label small"
+                  >Más información</label
+                >
+                <textarea
+                  class="form-control"
+                  id="candidateMoreInfo"
+                  rows="4"
+                ></textarea>
+              </div>
+
+              <div class="alert alert-info small" role="alert">
+                <i class="bi bi-info-circle"></i> Al confirmar, calcularemos tu
+                porcentaje de compatibilidad (Match %) con esta vacante.
+              </div>
+
+              <button
+                type="submit"
+                class="btn btn-success w-100"
+                id="submitApplicationBtn"
+              >
+                <i class="bi bi-send-check"></i> Enviar Postulación
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script type="module" src="../js/views/casual_user.js"></script>
-</body>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="../js/views/casual_user.js"></script>
+  </body>
 </html>
