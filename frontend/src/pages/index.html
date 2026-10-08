@@ -114,6 +114,41 @@
       </div>
     </div>
 
+    <div class="modal fade" id="jobDetailModal" tabindex="-1" aria-labelledby="jobDetailModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="jobDetailModalLabel">Detalle de la vacante</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <h6 class="fw-bold text-primary mb-1" id="modalJobTitle">Nombre del Cargo</h6>
+            <p class="text-muted small mb-3" id="modalJobSubtitle">Área y modalidad</p>
+            <div class="mb-3">
+              <strong>Descripción</strong>
+              <p class="text-secondary mb-0" id="modalJobDescription" style="white-space: pre-line;">-</p>
+            </div>
+            <div class="mb-3">
+              <strong>Beneficios</strong>
+              <p class="text-secondary mb-0" id="modalJobBenefits" style="white-space: pre-line;">Sin beneficios especificados.</p>
+            </div>
+            <div class="mb-3">
+              <strong>Habilidades técnicas</strong>
+              <div id="modalTechnicalSkills" class="d-flex flex-wrap gap-1"></div>
+            </div>
+            <div class="mb-3">
+              <strong>Habilidades blandas</strong>
+              <div id="modalSoftSkills" class="d-flex flex-wrap gap-1"></div>
+            </div>
+            <div class="text-muted small"><strong>Fecha límite:</strong> <span id="modalJobDeadline">Sin fecha límite</span></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal: Proceso de Postulación (Subida de CV y Confirmación) -->
     <div
       class="modal fade"
@@ -138,10 +173,10 @@
           </div>
 
           <div class="modal-body">
-            <h6 class="fw-bold text-primary mb-1" id="modalJobTitle">
+            <h6 class="fw-bold text-primary mb-1" id="applyModalJobTitle">
               Nombre del Cargo
             </h6>
-            <p class="text-muted small mb-3" id="modalJobSubtitle">
+            <p class="text-muted small mb-3" id="applyModalJobSubtitle">
               Área y modalidad
             </p>
             <hr />

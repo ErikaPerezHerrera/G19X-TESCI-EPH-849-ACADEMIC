@@ -152,80 +152,116 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderJobs(jobs) {
     const activeContainer = document.getElementById("activeJobsList");
+    const expiredContainer = document.getElementById("expiredJobsList");
     const closedContainer = document.getElementById("closedJobsList");
 
-    if (!activeContainer || !closedContainer) return;
+    if (!activeContainer || !expiredContainer || !closedContainer) return;
 
     const activeJobs = jobs.filter((j) => j.status === "active");
+    const expiredJobs = jobs.filter((j) => j.status === "expired");
     const closedJobs = jobs.filter((j) => j.status === "closed");
 
     activeContainer.innerHTML = activeJobs.length
-      ? activeJobs.map((job) => createJobCard(job, true)).join("")
+      ? activeJobs.map((job) => createJobCard(job, "active")).join("")
       : '<div class="col-12"><p class="text-muted p-3">No tienes vacantes activas actualmente.</p></div>';
 
+    expiredContainer.innerHTML = expiredJobs.length
+      ? expiredJobs.map((job) => createJobCard(job, "expired")).join("")
+      : '<div class="col-12"><p class="text-muted p-3">No tienes vacantes vencidas.</p></div>';
+
     closedContainer.innerHTML = closedJobs.length
-      ? closedJobs.map((job) => createJobCard(job, false)).join("")
+      ? closedJobs.map((job) => createJobCard(job, "closed")).join("")
       : '<div class="col-12"><p class="text-muted p-3">No tienes vacantes cerradas.</p></div>';
 
     attachJobEventListeners();
   }
 
-  function createJobCard(job, isActive) {
+  function createJobCard(job, status) {
     const skills = job.technical_skills || job.soft_skills || [];
+    const statusMap = {
+      active: { text: "ACTIVA", color: "bg-success" },
+      expired: { text: "VENCIDA", color: "bg-warning text-dark" },
+      closed: { text: "CERRADA", color: "bg-secondary" },
+    };
+    const selectedStatus = statusMap[status] || statusMap.active;
+
+    const isActive = status === "active";
+    const isExpired = status === "expired";
+    const isClosed = status === "closed";
+
+    // Generar botones según estado
+    let buttons = `
+    <button class="btn btn-sm btn-outline-secondary view-job-btn" data-id="${job.id}">
+      <i class="bi bi-eye"></i> Ver
+    </button>
+  `;
+
+    if (isActive) {
+      buttons += `
+      <button class="btn btn-outline-primary btn-sm view-candidates-btn" data-job-id="${job.id}" data-job-title="${job.title}">
+        <i class="bi bi-people"></i> Candidatos
+      </button>
+      <button class="btn btn-outline-danger btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="close">
+        <i class="bi bi-x-circle"></i> Cerrar
+      </button>
+    `;
+    }
+
+    if (isExpired) {
+      buttons += `
+      <button class="btn btn-outline-primary btn-sm view-candidates-btn" data-job-id="${job.id}" data-job-title="${job.title}">
+        <i class="bi bi-people"></i> Candidatos
+      </button>
+      <button class="btn btn-outline-danger btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="close">
+        <i class="bi bi-x-circle"></i> Cerrar
+      </button>
+      <button class="btn btn-outline-success btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="reopen">
+        <i class="bi bi-calendar-plus"></i> Extender fecha y reabrir
+      </button>
+    `;
+    }
+
+    if (isClosed) {
+      buttons += `
+      <button class="btn btn-outline-success btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="reopen">
+        <i class="bi bi-arrow-counterclockwise"></i> Editar y reabrir
+      </button>
+    `;
+    }
 
     return `
-      <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm border-0">
-          <div class="card-body d-flex flex-column">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <h5 class="card-title text-primary mb-0">${job.title}</h5>
-              <span class="badge ${isActive ? "bg-success" : "bg-secondary"}">
-                ${(job.status || "active").toUpperCase()}
-              </span>
-            </div>
-            <p class="card-text text-muted small mb-2">
-              <i class="bi bi-building"></i> ${job.area || "N/A"} | 
-              <i class="bi bi-laptop"></i> ${job.modality || job.work_mode || "N/A"}
-            </p>
-            <p class="card-text text-truncate flex-grow-1">${job.description || ""}</p>
-            
-            <div class="d-flex flex-wrap gap-1 mb-3">
-              ${skills
-                .slice(0, 3)
-                .map(
-                  (s) =>
-                    `<span class="badge bg-light text-dark border">${s}</span>`,
-                )
-                .join("")}
-            </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm border-0">
+        <div class="card-body d-flex flex-column">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <h5 class="card-title text-primary mb-0">${job.title}</h5>
+            <span class="badge ${selectedStatus.color}">${selectedStatus.text}</span>
+          </div>
+          <p class="card-text text-muted small mb-2">
+            <i class="bi bi-building"></i> ${job.area || "N/A"} |
+            <i class="bi bi-laptop"></i> ${job.modality || job.work_mode || "N/A"}
+          </p>
+          <p class="card-text text-truncate flex-grow-1">${job.description || ""}</p>
 
-            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-              <button class="btn btn-outline-primary btn-sm view-candidates-btn" data-job-id="${job.id}" data-job-title="${job.title}">
-                <i class="bi bi-people"></i> Candidatos
-              </button>
-              <button class="btn btn-sm btn-outline-secondary view-job-btn" data-id="${job.id}">
-                <i class="bi bi-eye"></i> Ver
-              </button>
-              
-              ${
-                isActive
-                  ? `
-                <button class="btn btn-outline-danger btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="close">
-                  <i class="bi bi-x-circle"></i> Cerrar
-                </button>
-              `
-                  : `
-                <button class="btn btn-outline-success btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="reopen">
-                  <i class="bi bi-arrow-counterclockwise"></i> Reabrir
-                </button>
-              `
-              }
-            </div>
+          <div class="d-flex flex-wrap gap-1 mb-3">
+            ${skills
+              .slice(0, 3)
+              .map(
+                (s) =>
+                  `<span class="badge bg-light text-dark border">${s}</span>`,
+              )
+              .join("")}
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+            ${buttons}
           </div>
         </div>
       </div>
-    `;
+    </div>
+  `;
   }
+
 
   function attachJobEventListeners() {
     // Ver Candidatos
@@ -258,13 +294,27 @@ document.addEventListener("DOMContentLoaded", async () => {
         const jobId = e.currentTarget.dataset.jobId;
         const action = e.currentTarget.dataset.action;
 
-        if (
-          confirm(
-            `¿Estás seguro de que deseas ${action === "close" ? "cerrar" : "reabrir"} esta vacante?`,
-          )
-        ) {
-          await toggleJobStatus(jobId, action);
+        if (action === "reopen") {
+          const job = currentJobs.find((item) => String(item.id) === String(jobId));
+          if (!job) {
+            alert("No se encontró la vacante que deseas reabrir.");
+            return;
+          }
+
+          const mode = job.status === "expired" ? "expired" : "closed";
+          window.location.href =
+            `publish.html?mode=reopen-${mode}&id=${encodeURIComponent(job.id)}`;
+          return;
         }
+
+        if (action === "close") {
+          const confirmed = confirm(
+            "Al cerrar esta vacante se eliminarán permanentemente las postulaciones de los candidatos asociados. ¿Deseas continuar?",
+          );
+          if (!confirmed) return;
+        }
+
+        await toggleJobStatus(jobId, action);
       });
     });
   }
@@ -301,6 +351,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (modalJobDescription)
       modalJobDescription.textContent =
         job.description || "Sin descripción disponible.";
+
+    const modalJobBenefits = document.getElementById("modalJobBenefits");
+    if (modalJobBenefits)
+      modalJobBenefits.textContent = job.benefits || "Sin beneficios especificados.";
 
     const modalJobDeadline = document.getElementById("modalJobDeadline");
     if (modalJobDeadline) {
