@@ -80,7 +80,7 @@ class Job(Base):
 
     # Estado de la vacante (ej: 'active', 'closed', 'paused')
     status = Column(
-        ENUM("draft", "active", "closed", name="job_status_enum"),
+        ENUM("draft", "active", "closed", "expired", name="job_status_enum"),
         nullable=False,
         default="draft",
         server_default="draft",
@@ -99,6 +99,9 @@ class Job(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    # Descripción completa y detallada de la oferta de trabajo
+    benefits = Column(Text, nullable=True)
 
     # --- RELACIONES DE ORM ---
     # Permite acceder al objeto del reclutador creador (ej: job.recruiter.email)

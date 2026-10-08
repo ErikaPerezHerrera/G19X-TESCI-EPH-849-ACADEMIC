@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -39,6 +40,20 @@ def create_application(
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
+    if job.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta vacante no está aceptando postulaciones.",
+        )
+    if job.deadline is not None:
+        deadline = job.deadline
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        if deadline <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="El plazo para postularse a esta vacante ha vencido.",
+            )
 
     resume = db.query(Resume).filter(Resume.id == payload.resume_id).first()
     if not resume:

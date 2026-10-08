@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -16,8 +18,11 @@ router = APIRouter(prefix="/resumes", tags=["resumes"])
 
 # 1. Extracción desde PDF (FormData para el frontend)
 @router.post("/extract")
-async def extract_resume_file(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".pdf"):
+async def extract_resume_file(
+    file: UploadFile = File(...), db: Session = Depends(get_db)
+):
+    filename = file.filename or ""
+    if not filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El archivo debe ser un PDF válido.",
@@ -25,9 +30,12 @@ async def extract_resume_file(file: UploadFile = File(...)):
 
     try:
         contents = await file.read()
-        return await extract_data_from_pdf(contents, file.filename)
+        extracted_data = await extract_data_from_pdf(contents, filename, db=db)
+        db.commit()
+        return extracted_data
 
     except Exception as e:
+        db.rollback()
         print(f"Error procesando el PDF: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -116,16 +124,20 @@ def create_resume(
         resume = Resume()
         db.add(resume)
 
-    parsed_skills = payload.parsed_data.get("technical_skills", []) if payload.parsed_data else []
-    soft_skills = payload.parsed_data.get("soft_skills", []) if payload.parsed_data else []
-    ensure_skills_cached(db, list(parsed_skills) + list(soft_skills) + list(payload.extracted_skills or []))
-
     resume.user_id = current_user.id if current_user is not None else None
     resume.candidate_email = candidate_email
     resume.raw_text = payload.raw_text
-    resume.parsed_data = payload.parsed_data
-    resume.extracted_skills = payload.extracted_skills
+    resume.parsed_data = payload.parsed_data or {}
+    resume.extracted_skills = payload.extracted_skills or []
     resume.file_name = payload.file_name
+    if current_user is None:
+        resume.expires_at = datetime.utcnow() + timedelta(days=365)
+    else:
+        resume.expires_at = None
+
+    parsed_skills = payload.parsed_data.get("technical_skills", []) if payload.parsed_data else []
+    soft_skills = payload.parsed_data.get("soft_skills", []) if payload.parsed_data else []
+    ensure_skills_cached(db, list(parsed_skills) + list(soft_skills) + list(payload.extracted_skills or []))
 
     db.commit()
     db.refresh(resume)

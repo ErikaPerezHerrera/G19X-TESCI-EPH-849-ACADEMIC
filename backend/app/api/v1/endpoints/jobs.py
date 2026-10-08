@@ -1,17 +1,30 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_recruiter, get_current_user
+from app.models.application import Application
 from app.models.job import Job
 from app.models.user import User
-from app.schemas.job import JobCreate, JobOut
+from app.schemas.job import JobCreate, JobOut, JobReopen
 
 from app.services.skill_cache_service import ensure_skills_cached
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+def _sync_expired_jobs(db: Session) -> None:
+    db.execute(
+        text(
+            "UPDATE jobs SET status = 'expired' "
+            "WHERE status = 'active' AND deadline IS NOT NULL AND deadline <= NOW()"
+        )
+    )
+    db.commit()
 
 
 @router.get("", response_model=list[JobOut])
@@ -19,6 +32,7 @@ def list_jobs(
     status_filter: Optional[str] = Query(default=None, alias="status"),
     db: Session = Depends(get_db)
 ):
+    _sync_expired_jobs(db)
     query = db.query(Job)
     if status_filter:
         query = query.filter(Job.status == status_filter)
@@ -56,11 +70,16 @@ def create_job(
         soft_skills=raw_soft,
         status=payload.status,
         deadline=payload.deadline,
+        benefits=payload.benefits
     )
 
-    db.add(job)
-    db.commit()
-    db.refresh(job)
+    try:
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Error al crear la vacante.")
 
     return job
 
@@ -72,20 +91,110 @@ def close_job(job_id: str, db: Session = Depends(get_db), current_user: User = D
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
     if job.recruiter_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para cerrar esta vacante")
+
     job.status = "closed"
+    db.query(Application).filter(Application.job_id == job.id).delete(synchronize_session=False)
     db.commit()
     db.refresh(job)
     return job
 
 
 @router.patch("/{job_id}/reopen", response_model=JobOut)
-def reopen_job(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_recruiter)):
+def reopen_job(
+    job_id: str,
+    payload: JobReopen,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_recruiter),
+):
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
     if job.recruiter_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para reabrir esta vacante")
+
+    if job.status == "expired":
+        if payload.model_fields_set != {"deadline"} or payload.deadline is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Para reabrir una vacante vencida solo puedes indicar una nueva fecha límite.",
+            )
+
+        deadline = payload.deadline
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        if deadline <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La nueva fecha límite debe ser futura.",
+            )
+
+        job.deadline = deadline
+    elif job.status == "closed":
+        required_fields = {
+            "title",
+            "area",
+            "profile_type",
+            "modality",
+            "location",
+            "description",
+            "technical_skills",
+            "soft_skills",
+            "deadline",
+            "benefits",
+        }
+        if not required_fields.issubset(payload.model_fields_set):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Completa los campos requeridos para reabrir la vacante cerrada.",
+            )
+
+        try:
+            values = JobCreate.model_validate(
+                payload.model_dump(exclude_unset=True) | {"status": "active"}
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+
+        deadline = values.deadline
+        if deadline is not None:
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
+            if deadline <= datetime.now(timezone.utc):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="La fecha límite debe ser futura.",
+                )
+
+        ensure_skills_cached(
+            db, values.technical_skills + values.soft_skills
+        )
+        job.title = values.title
+        job.area = values.area
+        job.profile_type = values.profile_type
+        job.modality = values.modality
+        job.location = values.location
+        job.description = values.description
+        job.technical_skills = values.technical_skills
+        job.soft_skills = values.soft_skills
+        job.deadline = deadline
+        job.benefits = values.benefits
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Solo se pueden reabrir vacantes cerradas o vencidas.",
+        )
+
     job.status = "active"
-    db.commit()
-    db.refresh(job)
+    try:
+        db.commit()
+        db.refresh(job)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo reabrir la vacante.",
+        ) from exc
     return job

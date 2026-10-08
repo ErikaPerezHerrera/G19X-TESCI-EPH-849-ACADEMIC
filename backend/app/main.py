@@ -77,6 +77,10 @@ def startup_event() -> None:
         with engine.begin() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         Base.metadata.create_all(bind=engine)
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TYPE job_status_enum ADD VALUE IF NOT EXISTS 'expired'")
+            )
     except Exception as exc:
         raise RuntimeError(
             f"No se pudo inicializar PostgreSQL/pgvector: {exc}"

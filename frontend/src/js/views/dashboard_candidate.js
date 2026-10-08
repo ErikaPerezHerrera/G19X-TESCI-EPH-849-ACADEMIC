@@ -471,6 +471,13 @@ function setupProfileFormListeners() {
       const token = localStorage.getItem("access_token");
       if (!token) return;
 
+      const existingResumeNotice =
+        "Si ya tenías otro CV vinculado a tu cuenta, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
+      const hasExistingResume = Boolean(profileForm.dataset.rawText || document.getElementById("resumeIdBadge"));
+      if (hasExistingResume && !window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")) {
+        return;
+      }
+
       const techSkillsStr = document.getElementById("techSkills")?.value || "";
       const softSkillsStr = document.getElementById("softSkills")?.value || "";
 

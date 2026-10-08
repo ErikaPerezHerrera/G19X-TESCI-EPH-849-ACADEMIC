@@ -1,30 +1,26 @@
-# Procesamiento en memoria con pdfplumber
 # pdf_extractor.py
 
 import re
-import spacy
-from typing import List, Tuple, Dict, Any
+from typing import Tuple
+
+from sqlalchemy.orm import Session
+
 from app.services.markdown_parser import (
     convert_pdf_to_markdown,
-    split_markdown_by_sections,
     clean_markdown_formatting,
 )
 
 from app.services.nlp_normalizer import (
-    process_and_normalize_resume_data,
     extract_address_from_text,
     detect_student_or_academic_title,
     extract_work_experience_or_projects,
-    parse_work_experience_blocks,
     extract_unclassified_info,
     collapse_spaced_letters,
-    TECH_EXACT_MAP,
+    extract_professional_title,
+    extract_resume_skills,
 )
+from app.services.skill_cache_service import cache_extracted_skill_terms
 
-try:
-    nlp = spacy.load("es_core_news_sm")
-except Exception:
-    nlp = None
 
 
 def clean_extracted_name(name_raw: str) -> str:
@@ -95,7 +91,9 @@ def extract_name_and_anonymize(raw_text: str, address: str = None) -> Tuple[str,
 
     return full_name, anonymized_text
     
-async def extract_data_from_pdf(file_contents: bytes, filename: str) -> dict:
+async def extract_data_from_pdf(
+    file_contents: bytes, filename: str, db: Session | None = None
+) -> dict:
     # 1. Convertir PDF a Markdown / Texto
     markdown_text = convert_pdf_to_markdown(file_contents)
 
@@ -110,11 +108,11 @@ async def extract_data_from_pdf(file_contents: bytes, filename: str) -> dict:
         except Exception:
             markdown_text = f"Texto del archivo {filename}"
 
-    # 2. Segmentar Markdown por secciones
-    sections = split_markdown_by_sections(markdown_text)
+    # Parse skill terms from labeled sections while preserving their source spelling.
+    technical_skills, soft_skills = extract_resume_skills(markdown_text)
     full_clean_text = clean_markdown_formatting(markdown_text)
 
-    # 3. Contacto y extracción inicial de PII
+    # 3. Contacto y extracción inicial de información
     email_match = re.search(
         r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", full_clean_text
     )
@@ -133,22 +131,11 @@ async def extract_data_from_pdf(file_contents: bytes, filename: str) -> dict:
     if not full_name:
         full_name = "Candidato Registrado"
 
-    # 4. Título Profesional y Normalización
+    # 4. Título profesional and original skill caching
     detected_title = detect_student_or_academic_title(full_clean_text)
-
-    skills_context = clean_markdown_formatting(
-        sections.get("skills", "") + " " + sections.get("experience", "")
-    )
-    if not skills_context.strip():
-        skills_context = full_clean_text
-
-    candidate_tokens = [
-        t.strip(",.:•-") for t in skills_context.split() if len(t.strip()) > 2
-    ]
-
-    professional_title, technical_skills, soft_skills, _ = (
-        await process_and_normalize_resume_data(anonymized_text, candidate_tokens)
-    )
+    professional_title = extract_professional_title(full_clean_text)
+    if db is not None:
+        await cache_extracted_skill_terms(db, technical_skills + soft_skills)
 
     # Forzar el título académico/estudiante si fue detectado
     if detected_title:
@@ -162,7 +149,7 @@ async def extract_data_from_pdf(file_contents: bytes, filename: str) -> dict:
     address_val = extracted_address or "Sin especificar"
 
     # 6. Extraer información no clasificada
-    all_skills = list(set(technical_skills + soft_skills))
+    all_skills = list(dict.fromkeys(technical_skills + soft_skills))
     more_info = extract_unclassified_info(
         raw_text=anonymized_text,
         full_name=full_name,

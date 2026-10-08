@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # ==========================================
 # ESQUEMAS DE ENTRADA (SOLICITUDES / REQUESTS)
@@ -47,13 +47,31 @@ class JobCreate(BaseModel):
     soft_skills: List[str] = Field(
         default_factory=list, description="Lista de habilidades blandas"
     )
-    status: Literal["draft", "active", "closed"] = Field(
+    status: Literal["draft", "active", "closed", "expired"] = Field(
         "active",
-        description="Estado inicial de la oferta: 'active', 'paused', 'closed'",
+        description="Estado inicial de la oferta: 'active', 'closed', 'expired'",
     )
     deadline: Optional[datetime] = Field(
         None, description="Fecha y hora límite de postulación"
     )
+    benefits: Optional[str] = Field(None, description="Beneficios")
+
+
+class JobReopen(BaseModel):
+    """Campos admitidos al reabrir una vacante, validados según su estado actual."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(None, min_length=3)
+    area: str | None = Field(None, min_length=2)
+    profile_type: str | None = Field(None, min_length=2)
+    modality: Literal["presencial", "remoto", "hibrido"] | None = None
+    location: str | None = None
+    description: str | None = Field(None, min_length=10)
+    technical_skills: List[str] | None = None
+    soft_skills: List[str] | None = None
+    deadline: datetime | None = None
+    benefits: str | None = None
 
 
 # ==========================================
@@ -77,8 +95,9 @@ class JobOut(BaseModel):
     description: str
     technical_skills: List[str]
     soft_skills: List[str]
-    status: Literal["draft", "active", "closed"]
+    status: Literal["draft", "active", "closed", "expired"]
     deadline: Optional[datetime] = None
+    benefits: Optional[str] = None
 
     class Config:
         # En Pydantic v2 mapea directamente las propiedades del objeto SQLAlchemy (db_job)

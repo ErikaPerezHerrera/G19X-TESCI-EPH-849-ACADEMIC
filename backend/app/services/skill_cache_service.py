@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from typing import Dict, Iterable, List, Optional
 
 import httpx
@@ -10,6 +12,7 @@ from app.services.skill_cosine_match import find_cosine_skill, generate_embeddin
 from app.services.skill_exact_match import find_exact_skill
 
 ESCO_API_SEARCH_URL = "https://ec.europa.eu/esco/api/search"
+logger = logging.getLogger(__name__)
 
 
 def normalize_skill_term(raw_term: Optional[str]) -> str:
@@ -49,6 +52,110 @@ def query_esco_api(term: str) -> Optional[Dict[str, str]]:
         print(f"Error al consultar API externa de ESCO para '{term}': {exc}")
 
     return None
+
+
+async def _query_esco_api_async(
+    client: httpx.AsyncClient,
+    term: str,
+    semaphore: asyncio.Semaphore,
+) -> Optional[Dict[str, str]]:
+    params = {"text": term, "type": "skill", "language": "es", "limit": 5}
+    try:
+        async with semaphore:
+            response = await client.get(ESCO_API_SEARCH_URL, params=params)
+        if response.status_code != 200:
+            logger.warning(
+                "ESCO devolvió HTTP %s al buscar una habilidad.",
+                response.status_code,
+            )
+            return None
+
+        results = response.json().get("_embedded", {}).get("results", [])
+        normalized_term = term.strip().casefold()
+        candidates = [
+            item
+            for item in results
+            if isinstance(item, dict) and str(item.get("title", "")).strip()
+        ]
+        selected = next(
+            (
+                item
+                for item in candidates
+                if str(item["title"]).strip().casefold() == normalized_term
+            ),
+            None,
+        )
+        if selected is None:
+            selected = next(
+                (
+                    item
+                    for item in candidates
+                    if normalized_term in str(item["title"]).strip().casefold()
+                ),
+                candidates[0] if candidates else None,
+            )
+        if selected is None:
+            return None
+
+        return {
+            "normalized_term": str(selected["title"]).strip(),
+            "esco_uri": str(selected.get("uri") or "").strip(),
+        }
+    except (httpx.HTTPError, ValueError, TypeError) as exc:
+        logger.warning("No se pudo consultar ESCO para una habilidad: %s", exc)
+        return None
+
+
+async def cache_extracted_skill_terms(
+    db: Session, skill_terms: Iterable[str]
+) -> List[SkillCache]:
+    """Cache exact resume skill terms, resolving uncached terms through ESCO."""
+    unique_terms: dict[str, str] = {}
+    for term in skill_terms or []:
+        if isinstance(term, str):
+            clean_term = normalize_skill_term(term)
+            if clean_term:
+                unique_terms.setdefault(clean_term.casefold(), clean_term)
+
+    cached_by_term: dict[str, SkillCache] = {}
+    uncached_terms: list[str] = []
+    for key, term in unique_terms.items():
+        cached = find_exact_skill(db, term)
+        if cached is None:
+            uncached_terms.append(term)
+        else:
+            cached_by_term[key] = cached
+
+    if uncached_terms:
+        semaphore = asyncio.Semaphore(5)
+        async with httpx.AsyncClient(timeout=3.5) as client:
+            esco_results = await asyncio.gather(
+                *(
+                    _query_esco_api_async(client, term, semaphore)
+                    for term in uncached_terms
+                )
+            )
+    else:
+        esco_results = []
+
+    for term, esco_data in zip(uncached_terms, esco_results):
+        normalized_term = (
+            esco_data.get("normalized_term", term) if esco_data else term
+        )
+        esco_uri = (esco_data.get("esco_uri") or None) if esco_data else None
+        embedding = await asyncio.to_thread(generate_embedding, normalized_term)
+        cached = _upsert_skill_record(
+            db=db,
+            raw_term=term,
+            normalized_term=normalized_term,
+            esco_uri=esco_uri,
+            embedding=embedding,
+        )
+        if cached is None:
+            raise RuntimeError(f"No se pudo guardar la habilidad extraída: {term}")
+        cached_by_term[term.casefold()] = cached
+
+    return [cached_by_term[key] for key in unique_terms if key in cached_by_term]
 
 
 def _upsert_skill_record(

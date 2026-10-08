@@ -121,7 +121,9 @@ document.addEventListener("DOMContentLoaded", () => {
               <i class="bi bi-laptop"></i> ${job.modality || "Presencial"}
             </p>
             <p class="card-text text-muted flex-grow-1 text-truncate">${job.description || ""}</p>
-            
+            <p class="text-secondary mb-3" style="white-space: pre-line;">${job.benefits || "Sin beneficios especificados."}</p>
+            <hr>
+
             <div class="d-flex flex-wrap gap-1 mb-3">
               ${(job.technical_skills || [])
                 .slice(0, 4)
@@ -132,9 +134,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 .join("")}
             </div>
 
-            <button class="btn btn-primary w-100 open-apply-modal-btn" data-job-id="${job.id}">
-              <i class="bi bi-send"></i> Postularme
-            </button>
+            <div class="d-grid gap-2">
+              <button class="btn btn-outline-secondary btn-sm view-job-detail-btn" data-job-id="${job.id}">
+                <i class="bi bi-info-circle"></i> Información
+              </button>
+              <button class="btn btn-primary w-100 open-apply-modal-btn" data-job-id="${job.id}">
+                <i class="bi bi-send"></i> Postularme
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -142,25 +149,69 @@ document.addEventListener("DOMContentLoaded", () => {
       )
       .join("");
 
-    // Eventos en botones Postularme
+    document.querySelectorAll(".view-job-detail-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const jobId = e.currentTarget.dataset.jobId;
+        openJobDetailModal(jobId);
+      });
+    });
+
     document.querySelectorAll(".open-apply-modal-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
-        selectedJobId = e.currentTarget.dataset.jobId;
+        const jobId = e.currentTarget.dataset.jobId;
+        selectedJobId = jobId;
         const job = allJobs.find((j) => j.id == selectedJobId);
 
         if (job) {
-          document.getElementById("modalJobTitle").innerText = job.title;
-          document.getElementById("modalJobSubtitle").innerText =
-            `${job.area || ""} • ${job.modality || ""}`;
+          const titleEl = document.getElementById("applyModalJobTitle");
+          const subtitleEl = document.getElementById("applyModalJobSubtitle");
+          if (titleEl) titleEl.innerText = job.title;
+          if (subtitleEl) subtitleEl.innerText = `${job.area || ""} • ${job.modality || ""}`;
 
-          // Mostrar modal primero
           if (applyModal) applyModal.show();
-
-          // Verificar si el usuario ya está autenticado para autocompletar su CV
           await checkAndPreloadUserResume();
         }
       });
     });
+  }
+
+  function openJobDetailModal(jobId) {
+    const job = allJobs.find((j) => String(j.id) === String(jobId));
+    if (!job) return;
+
+    const titleEl = document.getElementById("modalJobTitle");
+    const subtitleEl = document.getElementById("modalJobSubtitle");
+    const descriptionEl = document.getElementById("modalJobDescription");
+    const benefitsEl = document.getElementById("modalJobBenefits");
+    const deadlineEl = document.getElementById("modalJobDeadline");
+    const techSkillsEl = document.getElementById("modalTechnicalSkills");
+    const softSkillsEl = document.getElementById("modalSoftSkills");
+
+    if (titleEl) titleEl.textContent = job.title || "Sin título";
+    if (subtitleEl) subtitleEl.textContent = `${job.area || "General"} • ${job.modality || "Presencial"}`;
+    if (descriptionEl) descriptionEl.textContent = job.description || "Sin descripción disponible.";
+    if (benefitsEl) benefitsEl.textContent = job.benefits || "Sin beneficios especificados.";
+    if (deadlineEl) deadlineEl.textContent = job.deadline ? new Date(job.deadline).toLocaleDateString("es-ES") : "Sin fecha límite";
+
+    if (techSkillsEl) {
+      const skills = Array.isArray(job.technical_skills) ? job.technical_skills : [];
+      techSkillsEl.innerHTML = skills.length
+        ? skills.map((skill) => `<span class="badge bg-primary me-1 mb-1">${skill}</span>`).join("")
+        : '<span class="text-muted">Ninguna especificada</span>';
+    }
+
+    if (softSkillsEl) {
+      const skills = Array.isArray(job.soft_skills) ? job.soft_skills : [];
+      softSkillsEl.innerHTML = skills.length
+        ? skills.map((skill) => `<span class="badge bg-secondary me-1 mb-1">${skill}</span>`).join("")
+        : '<span class="text-muted">Ninguna especificada</span>';
+    }
+
+    const jobDetailModalElement = document.getElementById("jobDetailModal");
+    if (jobDetailModalElement) {
+      const modal = new bootstrap.Modal(jobDetailModalElement);
+      modal.show();
+    }
   }
 
   // Cargar datos preexistentes del CV si hay sesión activa
@@ -368,6 +419,13 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Error: No se identificó la vacante.");
       return;
     }
+
+
+    const existingResumeNotice = "Si ya tenías otro CV, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
+    if (!window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?"))
+      {     
+        return;
+      }
 
     const skillsInput = document.getElementById("candidateSkills").value;
     const techSkillsList = skillsInput

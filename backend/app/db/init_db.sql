@@ -12,6 +12,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 2. LIMPIEZA DE INSTANCIA PREVIA (para recrear desde cero)
+DROP TRIGGER IF EXISTS trg_cleanup_expired_casual_data ON resumes;
 DROP TRIGGER IF EXISTS trg_link_user_on_signup ON users;
 DROP TRIGGER IF EXISTS trg_validate_application_candidate ON applications;
 DROP TRIGGER IF EXISTS trg_email_templates_updated_at ON email_templates;
@@ -35,7 +36,7 @@ DROP TYPE IF EXISTS user_role_enum CASCADE;
 -- 3. ENUMS
 CREATE TYPE user_role_enum AS ENUM ('casual', 'registered', 'recruiter', 'admin');
 CREATE TYPE job_modality_enum AS ENUM ('presencial', 'remoto', 'hibrido');
-CREATE TYPE job_status_enum AS ENUM ('draft', 'active', 'closed');
+CREATE TYPE job_status_enum AS ENUM ('draft', 'active', 'expired', 'closed');
 CREATE TYPE application_status_enum AS ENUM (
     'received',
     'under_review',
@@ -101,6 +102,7 @@ CREATE TABLE jobs (
     deadline TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    benefits TEXT,
     CONSTRAINT chk_jobs_deadline_after_creation
         CHECK (deadline IS NULL OR deadline > created_at),
     CONSTRAINT chk_jobs_location_by_modality
@@ -165,6 +167,31 @@ CREATE TABLE email_templates (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE OR REPLACE FUNCTION cleanup_expired_casual_data()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    DELETE FROM applications a
+    USING resumes r
+    WHERE a.resume_id = r.id
+      AND r.user_id IS NULL
+      AND r.expires_at IS NOT NULL
+      AND r.expires_at <= NOW();
+
+    DELETE FROM resumes r
+    WHERE r.user_id IS NULL
+      AND r.expires_at IS NOT NULL
+      AND r.expires_at <= NOW();
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_cleanup_expired_casual_data
+AFTER INSERT OR UPDATE OF expires_at ON resumes
+FOR EACH ROW EXECUTE FUNCTION cleanup_expired_casual_data();
 
 -- 10. FUNCIÓN PARA updated_at
 CREATE OR REPLACE FUNCTION set_updated_at()
@@ -256,12 +283,58 @@ AFTER INSERT ON users
 FOR EACH ROW EXECUTE FUNCTION link_resumes_and_applications_on_user_signup();
 
 -- 13. SEMILLAS BÁSICAS
+INSERT INTO skills_cache (raw_term, normalized_term, esco_uri)
+VALUES
+    ('trabajo en equipo', 'trabajo en equipo', NULL),
+    ('comunicación', 'comunicación', NULL),
+    ('resolución de problemas', 'resolución de problemas', NULL),
+    ('adaptabilidad', 'adaptabilidad', NULL),
+    ('empatía', 'empatía', NULL),
+    ('pensamiento crítico', 'pensamiento crítico', NULL),
+    ('liderazgo', 'liderazgo', NULL),
+    ('aprendizaje continuo', 'aprendizaje continuo', NULL),
+    ('creatividad', 'creatividad', NULL),
+    ('organización', 'organización', NULL),
+    ('proactividad', 'proactividad', NULL),
+    ('negociación', 'negociación', NULL)
+ON CONFLICT DO NOTHING;
+
 INSERT INTO email_templates (template_key, subject, body_text, is_system_fallback)
 VALUES
     (
+        'account_created',
+        'Bienvenido a PluriJob',
+        'Hola {{candidate_name}}, ¡te damos la bienvenida a PluriJob! Ya puedes completar tu perfil, subir tu CV y postular a las vacantes que te interesen.',
+        TRUE
+    ),
+    (
         'application_received',
         'Tu postulación fue recibida',
-        'Hola, hemos recibido tu postulación correctamente. En breve revisaremos tu perfil y te contactaremos si avanzas en el proceso.',
+        'Hola {{candidate_name}}, hemos recibido tu postulación para {{job_title}}. En breve revisaremos tu perfil y te contactaremos si avanzas en el proceso.',
+        TRUE
+    ),
+    (
+        'application_rejected',
+        'Actualización de tu postulación',
+        'Hola {{candidate_name}}, gracias por tu interés. Después de revisar tu perfil, en esta ocasión no continuaremos con tu postulación para {{job_title}}.',
+        TRUE
+    ),
+    (
+        'vacancy_closed',
+        'Vacante cerrada',
+        'Hola {{candidate_name}}, la vacante {{job_title}} ha sido cerrada por el reclutador. Gracias por tu interés y te invitamos a seguir revisando nuevas oportunidades.',
+        TRUE
+    ),
+    (
+        'interview_progress',
+        'Avance de tu proceso',
+        'Hola {{candidate_name}}, hemos avanzado en tu proceso para {{job_title}}. Te contactaremos para coordinar la siguiente etapa o entrevista.',
+        TRUE
+    ),
+    (
+        'hired',
+        '¡Felicidades! Has sido seleccionado',
+        'Hola {{candidate_name}}, queremos informarte que has avanzado de forma favorable en el proceso de {{job_title}} y hemos decidido continuar contigo.',
         TRUE
     ),
     (
