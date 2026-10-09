@@ -13,6 +13,8 @@ from app.models.user import User
 from app.schemas.job import JobCreate, JobOut, JobReopen
 
 from app.services.skill_cache_service import ensure_skills_cached
+from app.services.vector_service import generate_embedding
+from app.services.matching_engine import recalculate_job_applications
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -81,6 +83,29 @@ def create_job(
         db.rollback()
         raise HTTPException(status_code=400, detail="Error al crear la vacante.")
 
+    try:
+        job.embedding = generate_embedding(job.description)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                f"La vacante {job.id} se creó, pero no se pudo generar su embedding: "
+                f"{exc}"
+            ),
+        ) from exc
+
+    try:
+        db.commit()
+        db.refresh(job)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                f"La vacante {job.id} se creó, pero no se pudo guardar su embedding."
+            ),
+        ) from exc
+
     return job
 
 
@@ -89,8 +114,6 @@ def close_job(job_id: str, db: Session = Depends(get_db), current_user: User = D
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
-    if job.recruiter_id != current_user.id:
-        raise HTTPException(status_code=403, detail="No tienes permiso para cerrar esta vacante")
 
     job.status = "closed"
     db.query(Application).filter(Application.job_id == job.id).delete(synchronize_session=False)
@@ -109,9 +132,8 @@ def reopen_job(
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
-    if job.recruiter_id != current_user.id:
-        raise HTTPException(status_code=403, detail="No tienes permiso para reabrir esta vacante")
 
+    reopening_closed_job = job.status == "closed"
     if job.status == "expired":
         if payload.model_fields_set != {"deadline"} or payload.deadline is None:
             raise HTTPException(
@@ -197,4 +219,42 @@ def reopen_job(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se pudo reabrir la vacante.",
         ) from exc
+
+    if reopening_closed_job:
+        try:
+            job.embedding = generate_embedding(job.description)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    f"La vacante {job.id} se reabrió, pero no se pudo generar "
+                    f"su embedding: {exc}"
+                ),
+            ) from exc
+
+        try:
+            db.commit()
+            db.refresh(job)
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"La vacante {job.id} se reabrió, pero no se pudo guardar "
+                    "su embedding."
+                ),
+            ) from exc
+
+    try:
+        recalculate_job_applications(db, job.id)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                f"La vacante {job.id} se reabrió, pero no se pudo recalcular "
+                "el matching de sus postulaciones."
+            ),
+        ) from exc
+
     return job

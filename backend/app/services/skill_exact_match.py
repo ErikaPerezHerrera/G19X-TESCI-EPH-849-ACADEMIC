@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.skill_cache import SkillCache
@@ -19,6 +19,11 @@ def find_exact_skill(db: Session, raw_term: Optional[str]) -> Optional[SkillCach
 
     return (
         db.query(SkillCache)
-        .filter(func.lower(SkillCache.raw_term) == normalized.lower())
+        .filter(
+            or_(
+                func.lower(SkillCache.raw_term) == normalized.lower(),
+                func.lower(SkillCache.normalized_term) == normalized.lower(),
+            )
+        )
         .first()
     )

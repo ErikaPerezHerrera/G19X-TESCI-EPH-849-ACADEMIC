@@ -16,6 +16,7 @@ from app.models.job import Job
 from app.models.resume import Resume
 from app.models.user import User
 from app.schemas.application import ApplicationCreate, ApplicationOut, ApplicationReject
+from app.services.matching_engine import recalculate_application_match
 from app.services.skill_cache_service import ensure_skills_cached
 
 router = APIRouter(prefix="", tags=["applications"])
@@ -102,7 +103,7 @@ def create_application(
         user_id=current_user.id if current_user is not None else None,
         resume_id=resume.id,
         candidate_email=candidate_email,
-        match_score=payload.match_score if payload.match_score is not None else 0.0,
+        match_score=None,
         status="received",
         match_details={
             "raw_skills": {
@@ -115,6 +116,17 @@ def create_application(
     db.add(application)
     db.commit()
     db.refresh(application)
+
+    try:
+        recalculate_application_match(application, db)
+        db.commit()
+        db.refresh(application)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="La postulación se guardó, pero no se pudo calcular el matching.",
+        ) from exc
 
     return application
 

@@ -16,8 +16,17 @@ class FakeQuery:
     def filter(self, *_conditions):
         return self
 
+    def options(self, *_options):
+        return self
+
     def first(self):
         return self.value
+
+    def all(self):
+        return []
+
+    def delete(self, synchronize_session=False):
+        return 0
 
 
 class FakeDatabase:
@@ -61,6 +70,14 @@ def test_reopening_closed_job_updates_same_record(monkeypatch):
     job = make_job("closed")
     db = FakeDatabase(job)
     monkeypatch.setattr(jobs, "ensure_skills_cached", lambda *_args: None)
+    embedding = [0.75] * 384
+
+    def generate_after_commit(text):
+        assert db.committed
+        assert text == "Crear y mantener servicios API"
+        return embedding
+
+    monkeypatch.setattr(jobs, "generate_embedding", generate_after_commit)
     deadline = datetime.now(timezone.utc) + timedelta(days=10)
 
     result = jobs.reopen_job(
@@ -78,7 +95,7 @@ def test_reopening_closed_job_updates_same_record(monkeypatch):
             benefits="Seguro médico",
         ),
         db,
-        SimpleNamespace(id="recruiter-id"),
+        SimpleNamespace(id="different-recruiter-id", role="recruiter"),
     )
 
     assert result is job
@@ -86,25 +103,51 @@ def test_reopening_closed_job_updates_same_record(monkeypatch):
     assert result.status == "active"
     assert result.title == "Desarrollador API"
     assert result.technical_skills == ["Python", "FastAPI"]
+    assert result.embedding == embedding
     assert db.committed
 
 
-def test_reopening_expired_job_only_changes_deadline():
+def test_reopening_expired_job_only_changes_deadline(monkeypatch):
     job = make_job("expired")
+    existing_embedding = [0.4] * 384
+    job.embedding = existing_embedding
     original_title = job.title
     db = FakeDatabase(job)
+
+    def fail_if_embedding_is_generated(_text):
+        raise AssertionError(
+            "No se debe recalcular el embedding de una vacante vencida."
+        )
+
+    monkeypatch.setattr(jobs, "generate_embedding", fail_if_embedding_is_generated)
     deadline = datetime.now(timezone.utc) + timedelta(days=10)
 
     result = jobs.reopen_job(
         str(job.id),
         JobReopen(deadline=deadline),
         db,
-        SimpleNamespace(id="recruiter-id"),
+        SimpleNamespace(id="different-recruiter-id", role="recruiter"),
     )
 
     assert result.status == "active"
     assert result.title == original_title
     assert result.deadline == deadline
+    assert result.embedding == existing_embedding
+    assert db.committed
+
+
+def test_recruiter_can_close_an_expired_job_created_by_another_recruiter():
+    job = make_job("expired")
+    db = FakeDatabase(job)
+
+    result = jobs.close_job(
+        str(job.id),
+        db,
+        SimpleNamespace(id="different-recruiter-id", role="recruiter"),
+    )
+
+    assert result is job
+    assert result.status == "closed"
     assert db.committed
 
 

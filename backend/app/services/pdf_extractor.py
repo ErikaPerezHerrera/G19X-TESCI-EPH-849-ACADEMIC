@@ -84,7 +84,7 @@ def extract_name_and_anonymize(raw_text: str, address: str = None) -> Tuple[str,
     anonymized_text = re.sub(email_pattern, "[EMAIL_OCULTO]", anonymized_text)
     anonymized_text = re.sub(phone_pattern, "[TELÉFONO_OCULTO]", anonymized_text)
 
-    # Anonimizar Dirección con límites de palabra (\b) para evitar romper "Ébano" -> "É"
+    # Anonimizar Dirección con límites de palabra (\b) para evitar romper palabras"
     if address and address != "Sin especificar":
         clean_addr_pattern = re.escape(address.strip())
         anonymized_text = re.sub(r"\b" + clean_addr_pattern + r"\b", "[DIRECCIÓN_OCULTA]", anonymized_text, flags=re.IGNORECASE)
@@ -110,6 +110,10 @@ async def extract_data_from_pdf(
 
     # Parse skill terms from labeled sections while preserving their source spelling.
     technical_skills, soft_skills = extract_resume_skills(markdown_text)
+    if db is not None:
+        await cache_extracted_skill_terms(
+            db, technical_skills + soft_skills
+        )
     full_clean_text = clean_markdown_formatting(markdown_text)
 
     # 3. Contacto y extracción inicial de información
@@ -134,8 +138,6 @@ async def extract_data_from_pdf(
     # 4. Título profesional and original skill caching
     detected_title = detect_student_or_academic_title(full_clean_text)
     professional_title = extract_professional_title(full_clean_text)
-    if db is not None:
-        await cache_extracted_skill_terms(db, technical_skills + soft_skills)
 
     # Forzar el título académico/estudiante si fue detectado
     if detected_title:

@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
@@ -11,7 +12,9 @@ from app.models.user import User
 from app.schemas.resume import ResumeCreate, ResumeExtractRequest, ResumeOut
 from app.services.pdf_extractor import extract_data_from_pdf
 from app.services.nlp_normalizer import extract_address_from_text
+from app.services.matching_engine import recalculate_resume_applications
 from app.services.skill_cache_service import ensure_skills_cached
+from app.services.vector_service import generate_embedding
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
@@ -139,8 +142,61 @@ def create_resume(
     soft_skills = payload.parsed_data.get("soft_skills", []) if payload.parsed_data else []
     ensure_skills_cached(db, list(parsed_skills) + list(soft_skills) + list(payload.extracted_skills or []))
 
+    # Persist the resume data before generating and storing its work-experience vector.
     db.commit()
     db.refresh(resume)
+
+    work_experience = (resume.parsed_data or {}).get("work_experience")
+    if isinstance(work_experience, str):
+        experience_text = work_experience
+    elif isinstance(work_experience, list):
+        experience_text = "\n".join(
+            item if isinstance(item, str) else json.dumps(item, ensure_ascii=False)
+            for item in work_experience
+            if item
+        )
+    else:
+        experience_text = (
+            json.dumps(work_experience, ensure_ascii=False)
+            if work_experience
+            else ""
+        )
+
+    try:
+        resume.embedding = generate_embedding(experience_text)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                f"El CV {resume.id} se guardó, pero no se pudo generar su embedding: "
+                f"{exc}"
+            ),
+        ) from exc
+
+    try:
+        db.commit()
+        db.refresh(resume)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                f"El CV {resume.id} se guardó, pero no se pudo guardar su embedding."
+            ),
+        ) from exc
+
+    try:
+        recalculate_resume_applications(db, resume.id)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                f"El CV {resume.id} se guardó, pero no se pudo recalcular el "
+                "matching de sus postulaciones."
+            ),
+        ) from exc
+
     return resume
 
 # 4. Mis CVs

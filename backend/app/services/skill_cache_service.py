@@ -92,7 +92,7 @@ async def _query_esco_api_async(
                     for item in candidates
                     if normalized_term in str(item["title"]).strip().casefold()
                 ),
-                candidates[0] if candidates else None,
+                None,
             )
         if selected is None:
             return None
@@ -109,7 +109,7 @@ async def _query_esco_api_async(
 async def cache_extracted_skill_terms(
     db: Session, skill_terms: Iterable[str]
 ) -> List[SkillCache]:
-    """Cache exact resume skill terms, resolving uncached terms through ESCO."""
+    """Cache resume terms in exact, ESCO, then cosine-similarity order."""
     unique_terms: dict[str, str] = {}
     for term in skill_terms or []:
         if isinstance(term, str):
@@ -124,6 +124,7 @@ async def cache_extracted_skill_terms(
         if cached is None:
             uncached_terms.append(term)
         else:
+            _ensure_skill_embedding(db, cached, term)
             cached_by_term[key] = cached
 
     if uncached_terms:
@@ -139,8 +140,14 @@ async def cache_extracted_skill_terms(
         esco_results = []
 
     for term, esco_data in zip(uncached_terms, esco_results):
+        cosine_match = None
+        if esco_data is None:
+            cosine_match = find_cosine_skill(db, term)
+
         normalized_term = (
-            esco_data.get("normalized_term", term) if esco_data else term
+            esco_data.get("normalized_term", term)
+            if esco_data
+            else cosine_match.normalized_term if cosine_match else term
         )
         esco_uri = (esco_data.get("esco_uri") or None) if esco_data else None
         embedding = await asyncio.to_thread(generate_embedding, normalized_term)
@@ -153,6 +160,7 @@ async def cache_extracted_skill_terms(
         )
         if cached is None:
             raise RuntimeError(f"No se pudo guardar la habilidad extraída: {term}")
+        _ensure_skill_embedding(db, cached, term)
         cached_by_term[term.casefold()] = cached
 
     return [cached_by_term[key] for key in unique_terms if key in cached_by_term]
@@ -198,25 +206,20 @@ def get_or_fetch_skill(db: Session, raw_term: str):
 
     cached = find_exact_skill(db, clean_term)
     if cached:
-        if cached.embedding is None:
-            embedding = generate_embedding(cached.normalized_term) or generate_embedding(
-                clean_term
-            )
-            if embedding is not None:
-                cached.embedding = embedding
-                db.flush()
-        return cached
-
-    cached = find_cosine_skill(db, clean_term)
-    if cached:
+        _ensure_skill_embedding(db, cached, clean_term)
         return cached
 
     esco_data = query_esco_api(clean_term)
+    cosine_match = find_cosine_skill(db, clean_term) if esco_data is None else None
     normalized_term = (
-        esco_data.get("normalized_term") if esco_data else clean_term
+        esco_data.get("normalized_term")
+        if esco_data
+        else cosine_match.normalized_term if cosine_match else clean_term
     )
     esco_uri = esco_data.get("esco_uri") if esco_data else None
-    embedding = generate_embedding(normalized_term) or generate_embedding(clean_term)
+    embedding = generate_embedding(normalized_term)
+    if embedding is None:
+        embedding = generate_embedding(clean_term)
 
     existing = (
         db.query(SkillCache)
@@ -226,13 +229,50 @@ def get_or_fetch_skill(db: Session, raw_term: str):
     if existing:
         return existing
 
-    return _upsert_skill_record(
+    cached = _upsert_skill_record(
         db=db,
         raw_term=clean_term,
         normalized_term=normalized_term,
         esco_uri=esco_uri,
         embedding=embedding,
     )
+    if cached is not None:
+        _ensure_skill_embedding(db, cached, clean_term)
+    return cached
+
+
+def _ensure_skill_embedding(
+    db: Session, skill: SkillCache, fallback_term: str
+) -> bool:
+    if skill.embedding is not None:
+        return False
+
+    embedding = generate_embedding(skill.normalized_term)
+    if embedding is None:
+        embedding = generate_embedding(fallback_term)
+    if embedding is None:
+        raise RuntimeError(
+            f"No se pudo generar el embedding de la habilidad: {fallback_term}"
+        )
+
+    skill.embedding = embedding
+    db.flush()
+    return True
+
+
+def backfill_missing_skill_embeddings(db: Session) -> int:
+    """Generate and assign vectors for every skill-cache row missing one."""
+    skills = (
+        db.query(SkillCache)
+        .filter(SkillCache.embedding.is_(None))
+        .order_by(SkillCache.id)
+        .all()
+    )
+    updated = 0
+    for skill in skills:
+        if _ensure_skill_embedding(db, skill, skill.raw_term):
+            updated += 1
+    return updated
 
 
 def ensure_skills_cached(db: Session, skills_list: Iterable[str]) -> List[SkillCache]:
