@@ -19,16 +19,17 @@ services:
       retries: 5
 
   backend:
-    network_mode: host
     build:
       context: ./backend
     container_name: plurijob-api
     restart: unless-stopped
+    ports:
+      - "8000:8000"  # <--- Mapeo explícito de puertos para exponer /docs y la API
     env_file:
       - ./backend/.env
     environment:
-      POSTGRES_SERVER: 127.0.0.1
-      POSTGRES_PORT: 5433
+      POSTGRES_SERVER: postgres  # <--- Usar el nombre del servicio dentro de la red de Docker
+      POSTGRES_PORT: 5432      # <--- Puerto interno por defecto de Postgres
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: K1k@k0kA
       POSTGRES_DB: PluriJob
@@ -40,5 +41,6 @@ services:
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
 volumes:
   postgres_data:
