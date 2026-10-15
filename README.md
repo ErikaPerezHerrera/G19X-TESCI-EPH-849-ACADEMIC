@@ -25,9 +25,8 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 ```
 docker-compose up --build -d
 ```
-4. Copia una de las siguientes direcciones y pégala en tu navegador para probar el sistema de forma local: 
+4. Copia la siguiente direcció y pégala en tu navegador para probar el sistema de forma local: 
 `http://127.0.0.1:5500/frontend/src/pages/index.html`
-`http://localhost:5500/frontend/src/pages/index.html`
 
 ## Respaldo de la base de datos
 Este proyecto incluye:
