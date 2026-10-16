@@ -1,19 +1,19 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: postgres
+    container_name: nombreContenedor
     restart: unless-stopped
     environment:
-      POSTGRES_DB: PluriJob
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: K1k@k0kA
+      POSTGRES_DB: nombreBasedeDatos
+      POSTGRES_USER: nombreUsuarioBasedeDatos
+      POSTGRES_PASSWORD: contraseñaBasedeDatos
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/app/db/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d PluriJob"]
+      test: ["CMD-SHELL", "pg_isready -U nombreUsuarioBasedeDatos -d nombreBasedeDatos"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,11 +28,11 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      POSTGRES_SERVER: postgres  # <--- Usar el nombre del servicio dentro de la red de Docker
+      POSTGRES_SERVER: nombreContenedor  # <--- Usar el nombre del servicio dentro de la red de Docker
       POSTGRES_PORT: 5432      # <--- Puerto interno por defecto de Postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: K1k@k0kA
-      POSTGRES_DB: PluriJob
+      POSTGRES_USER: nombreUsuarioBasedeDatos
+      POSTGRES_PASSWORD: contraseñaBasedeDatos
+      POSTGRES_DB: nombreBasedeDatos
       PROJECT_NAME: PluriJob API
       API_V1_STR: /api/v1
     depends_on:
