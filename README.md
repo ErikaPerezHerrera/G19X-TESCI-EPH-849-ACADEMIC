@@ -38,7 +38,9 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal:
 ```
 docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backup.sql
 ```
-**nombreContenedor**, **nombreUsuario** y **nombreBase** deben coincidir con los de los archivos`docker-compose.yml`, `.env` y `app>core>config.py`.
+**nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos`docker-compose.yml`, `.env` y `app>core>config.py`.
+
+**GEMINI_API_KEY** debe coincidir en `.env` y `app>core>config.py`.
 
 ### Notas importantes
 - El volumen `postgres_data` asegura que los datos persistan aunque se reinicie el contenedor.
