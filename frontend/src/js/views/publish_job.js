@@ -41,6 +41,122 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   const submitButton = jobForm.querySelector('button[type="submit"]');
   const resetButton = jobForm.querySelector('button[type="reset"]');
+  const aiDraftSection = document.querySelector("#aiJobInstruction")?.closest("section");
+  const aiInstruction = document.getElementById("aiJobInstruction");
+  const generateDraftButton = document.getElementById("generateJobDraftButton");
+  const aiNotice = document.getElementById("jobAiNotice");
+
+  if (reopenType && aiDraftSection) aiDraftSection.classList.add("d-none");
+
+  const showAiNotice = (message, type) => {
+    if (!aiNotice) return;
+    aiNotice.className = `alert alert-${type} mt-3 mb-0`;
+    aiNotice.textContent = message;
+    aiNotice.setAttribute(
+      "role",
+      type === "warning" || type === "danger" ? "alert" : "status",
+    );
+  };
+
+  const fillFromDraft = (draft) => {
+    const textFields = [
+      ["title", fields.title],
+      ["area", fields.area],
+      ["profile_type", fields.profileType],
+      ["location", fields.location],
+      ["description", fields.description],
+      ["benefits", fields.benefits],
+    ];
+    textFields.forEach(([key, field]) => {
+      if (typeof draft[key] === "string" && draft[key].trim()) {
+        field.value = draft[key].trim();
+      }
+    });
+
+    if (Array.isArray(draft.technical_skills) && draft.technical_skills.length) {
+      fields.technicalSkills.value = draft.technical_skills.join(", ");
+    }
+    if (Array.isArray(draft.soft_skills) && draft.soft_skills.length) {
+      fields.softSkills.value = draft.soft_skills.join(", ");
+    }
+
+    const modality = String(draft.modality || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    if (["presencial", "remoto", "hibrido"].includes(modality)) {
+      fields.modality.value = modality;
+    }
+
+    if (typeof draft.deadline === "string" && draft.deadline.trim()) {
+      const deadlineDate = new Date(draft.deadline);
+      if (!Number.isNaN(deadlineDate.getTime())) {
+        fields.deadline.value = toLocalDateTimeInputValue(deadlineDate);
+      }
+    }
+  };
+
+  if (generateDraftButton && aiInstruction) {
+    generateDraftButton.addEventListener("click", async () => {
+      const instruction = aiInstruction.value.trim();
+      if (instruction.length < 3) {
+        showAiNotice("Escribe una instrucción o pega el texto de la vacante para generar el borrador.", "warning");
+        aiInstruction.focus();
+        return;
+      }
+
+      generateDraftButton.disabled = true;
+      generateDraftButton.setAttribute("aria-busy", "true");
+      generateDraftButton.innerHTML =
+        '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Generando...';
+      if (aiNotice) aiNotice.classList.add("d-none");
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/jobs/draft`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ instruction }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail =
+            typeof result.detail === "string"
+              ? result.detail
+              : "No se pudo contactar el servicio de generación de vacantes.";
+          throw new Error(detail);
+        }
+
+        if (!result.ai_available || !result.draft) {
+          showAiNotice(
+            "La IA no está disponible en este momento. Inténtalo más tarde o completa el formulario manualmente.",
+            "warning",
+          );
+          return;
+        }
+
+        fillFromDraft(result.draft);
+        showAiNotice(
+          "Borrador generado. Revisa la información y completa cualquier campo faltante antes de publicar.",
+          "success",
+        );
+      } catch (error) {
+        console.error("No se pudo generar el borrador de vacante con IA:", error);
+        showAiNotice(
+          "La IA no está disponible en este momento. Inténtalo más tarde o completa el formulario manualmente.",
+          "warning",
+        );
+      } finally {
+        generateDraftButton.disabled = false;
+        generateDraftButton.removeAttribute("aria-busy");
+        generateDraftButton.innerHTML =
+          '<i class="bi bi-magic me-2" aria-hidden="true"></i>Generar borrador';
+      }
+    });
+  }
 
   if (reopenType) {
     const header = document.querySelector(".card-header .card-title");

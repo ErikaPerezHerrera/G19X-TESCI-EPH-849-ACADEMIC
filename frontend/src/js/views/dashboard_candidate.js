@@ -420,33 +420,67 @@ function setupProfileFormListeners() {
         }
 
         const extracted = await response.json();
+        const parsed = extracted.parsed_data || {};
+        const aiNotice = document.getElementById("cvAiNotice");
+        if (aiNotice) {
+          const aiAvailable = extracted.ai_enrichment_status === "success";
+          aiNotice.className = `alert alert-${aiAvailable ? "success" : "warning"} mt-3 mb-0`;
+          aiNotice.textContent = aiAvailable
+            ? "La IA enriqueció los datos extraídos. Revisa y corrige la información antes de guardarla."
+            : "La IA no está disponible en este momento. Se muestran los datos de extracción automática; puedes revisarlos y completar el perfil manualmente.";
+          aiNotice.setAttribute("role", aiAvailable ? "status" : "alert");
+        }
 
-        if (extracted.full_name)
-          document.getElementById("fullName").value = extracted.full_name;
-        if (extracted.email)
-          document.getElementById("email").value = extracted.email;
-        if (extracted.phone)
-          document.getElementById("phone").value = extracted.phone;
-        if (extracted.professional_title)
+        if (extracted.full_name || parsed.full_name)
+          document.getElementById("fullName").value =
+            extracted.full_name || parsed.full_name;
+        if (extracted.email || parsed.email)
+          document.getElementById("email").value =
+            extracted.email || parsed.email;
+        if (extracted.phone || parsed.phone)
+          document.getElementById("phone").value =
+            extracted.phone || parsed.phone;
+        if (extracted.professional_title || parsed.professional_title)
           document.getElementById("currentTitle").value =
-            extracted.professional_title;
-        if (extracted.work_experience)
-          document.getElementById("experienceSummary").value =
-            extracted.work_experience;
-        if (extracted.address || extracted.location)
+            extracted.professional_title || parsed.professional_title;
+        const workExperience =
+          extracted.work_experience || parsed.work_experience;
+        if (workExperience) {
+          document.getElementById("experienceSummary").value = Array.isArray(
+            workExperience,
+          )
+            ? workExperience
+                .map((item) =>
+                  typeof item === "string" ? item : JSON.stringify(item),
+                )
+                .join("\n\n")
+            : workExperience;
+        }
+        if (
+          extracted.address ||
+          extracted.location ||
+          parsed.address ||
+          parsed.location
+        )
           document.getElementById("address").value =
-            extracted.address || extracted.location;
-        if (Array.isArray(extracted.technical_skills)) {
+            extracted.address ||
+            extracted.location ||
+            parsed.address ||
+            parsed.location;
+        const technicalSkills =
+          extracted.technical_skills || parsed.technical_skills;
+        if (Array.isArray(technicalSkills)) {
           document.getElementById("techSkills").value =
-            extracted.technical_skills.join(", ");
+            technicalSkills.join(", ");
         }
-        if (Array.isArray(extracted.soft_skills)) {
+        const softSkills = extracted.soft_skills || parsed.soft_skills;
+        if (Array.isArray(softSkills)) {
           document.getElementById("softSkills").value =
-            extracted.soft_skills.join(", ");
+            softSkills.join(", ");
         }
-        if (extracted.parsed_data.more_info)
+        if (parsed.more_info || extracted.more_info)
           document.getElementById("moreInfo").value =
-            extracted.parsed_data.more_info;        
+            parsed.more_info || extracted.more_info;
 
         if (profileForm) {
           profileForm.dataset.rawText =
