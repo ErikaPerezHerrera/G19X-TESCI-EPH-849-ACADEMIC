@@ -315,10 +315,11 @@ document.addEventListener("DOMContentLoaded", () => {
     renderJobs(filtered);
   }
 
-  // Extracción del CV (PDF) para usuarios sin sesión / anónimos
+  // Extracción del CV (PDF)
   async function handleExtractCV() {
     const fileInput = document.getElementById("cvFileInput");
     const extractBtn = document.getElementById("extractCvBtn");
+    const aiNotice = document.getElementById("cvAiNotice");
     const file = fileInput?.files[0];
 
     if (!file) {
@@ -336,6 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (extractBtn) extractBtn.disabled = true;
     document.getElementById("extractionSpinner")?.classList.remove("d-none");
+    aiNotice?.classList.add("d-none");
 
     try {
       const response = await fetch(`${API_BASE_URL}/resumes/extract`, {
@@ -346,28 +348,38 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!response.ok) throw new Error("Error al procesar el archivo PDF");
 
       extractedResumeData = await response.json();
+      const parsed = extractedResumeData.parsed_data || {};
+      if (aiNotice) {
+        const aiAvailable =
+          extractedResumeData.ai_enrichment_status === "success";
+        aiNotice.className = `alert alert-${aiAvailable ? "success" : "warning"} mx-3 mb-3`;
+        aiNotice.textContent = aiAvailable
+          ? "La IA enriqueció los datos extraídos. Revisa y corrige la información antes de enviar tu postulación."
+          : "La IA no está disponible en este momento. Se muestran los datos de extracción automática; puedes revisarlos y completar la información manualmente.";
+        aiNotice.setAttribute("role", aiAvailable ? "status" : "alert");
+      }
 
       document.getElementById("candidateFullName").value =
-        extractedResumeData.full_name || extractedResumeData.parsed_data?.full_name || "";
+        extractedResumeData.full_name || parsed.full_name || "";
 
       const emailInput = document.getElementById("candidateEmail");
       if (emailInput && !emailInput.value) {
-        emailInput.value = extractedResumeData.email || extractedResumeData.parsed_data?.email || "";
+        emailInput.value = extractedResumeData.email || parsed.email || "";
       }
 
       document.getElementById("candidateAddress").value =
-        extractedResumeData.address || extractedResumeData.parsed_data?.address || "";
+        extractedResumeData.address || parsed.address || parsed.location || "";
 
       document.getElementById("candidatePhone").value =
-        extractedResumeData.phone || extractedResumeData.parsed_data?.phone || "";
+        extractedResumeData.phone || parsed.phone || "";
       document.getElementById("candidateTitle").value =
-        extractedResumeData.professional_title || extractedResumeData.parsed_data?.professional_title || "";
+        extractedResumeData.professional_title || parsed.professional_title || "";
 
-      const techSkillsArr = extractedResumeData.technical_skills || extractedResumeData.parsed_data?.technical_skills || [];
+      const techSkillsArr = extractedResumeData.technical_skills || parsed.technical_skills || [];
       document.getElementById("candidateSkills").value =
         Array.isArray(techSkillsArr) ? techSkillsArr.join(", ") : techSkillsArr;
 
-      const softSkillsArr = extractedResumeData.soft_skills || extractedResumeData.parsed_data?.soft_skills || [];
+      const softSkillsArr = extractedResumeData.soft_skills || parsed.soft_skills || [];
       document.getElementById("candidateSoftSkills").value =
         Array.isArray(softSkillsArr) ? softSkillsArr.join(", ") : softSkillsArr;
 
@@ -375,7 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const moreInfoInput = document.getElementById("candidateMoreInfo");
       if (moreInfoInput) {
         moreInfoInput.value =
-          extractedResumeData.parsed_data?.more_info || extractedResumeData.more_info || "";
+          parsed.more_info || extractedResumeData.more_info || "";
       }
 
       let experienceText = "";
@@ -390,8 +402,17 @@ document.addEventListener("DOMContentLoaded", () => {
             return String(exp);
           })
           .join("\n\n");
-      } else if (extractedResumeData.parsed_data?.summary) {
-        experienceText = extractedResumeData.parsed_data.summary;
+      } else if (parsed.work_experience) {
+        const parsedExperience = parsed.work_experience;
+        experienceText = Array.isArray(parsedExperience)
+          ? parsedExperience
+              .map((item) =>
+                typeof item === "string" ? item : JSON.stringify(item),
+              )
+              .join("\n\n")
+          : parsedExperience;
+      } else if (parsed.summary) {
+        experienceText = parsed.summary;
       } else {
         experienceText = extractedResumeData.raw_text || "";
       }

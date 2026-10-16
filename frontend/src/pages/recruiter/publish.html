@@ -37,7 +37,36 @@
             <h4 class="card-title mb-0 fs-5"><i class="bi bi-briefcase-fill me-2"></i>Crear Nueva Vacante</h4>
           </div>
           <div class="card-body p-4">
-            
+
+            <section class="border rounded-3 bg-light p-3 mb-4" aria-labelledby="aiJobDraftTitle">
+              <div class="d-flex align-items-start gap-3">
+                <div class="text-primary fs-4" aria-hidden="true">
+                  <i class="bi bi-stars"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <h5 id="aiJobDraftTitle" class="h6 fw-bold mb-1">Crear borrador con IA</h5>
+                  <p class="text-muted small mb-3">
+                    Describe el puesto o pega el texto extraído de un documento. La IA preparará los campos para que los revises antes de publicar.
+                  </p>
+                  <label for="aiJobInstruction" class="form-label fw-semibold">Instrucciones o texto de la vacante</label>
+                  <textarea
+                    class="form-control mb-2"
+                    id="aiJobInstruction"
+                    rows="3"
+                    maxlength="12000"
+                    placeholder="Ej. Buscamos un desarrollador backend con experiencia en Python, FastAPI y PostgreSQL. Modalidad remota..."
+                  ></textarea>
+                  <div class="d-flex flex-wrap align-items-center gap-3">
+                    <button type="button" class="btn btn-outline-primary" id="generateJobDraftButton">
+                      <i class="bi bi-magic me-2" aria-hidden="true"></i>Generar borrador
+                    </button>
+                    <span class="text-muted small">La IA puede equivocarse; revisa y completa los datos antes de guardar.</span>
+                  </div>
+                  <div id="jobAiNotice" class="alert d-none mt-3 mb-0" role="status" aria-live="polite"></div>
+                </div>
+              </div>
+            </section>
+
             <form id="publishJobForm">
               
               <!-- Título de la Vacante -->
