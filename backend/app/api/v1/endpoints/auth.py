@@ -1,7 +1,7 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -13,6 +13,7 @@ from app.core.security import (
     verify_password,
 )
 from app.api.dependencies import get_current_user_dep
+from app.models.resume import Resume
 from app.models.user import User
 from app.schemas.user import Token, UserCreate, UserLogin, UserOut
 
@@ -52,6 +53,18 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
         is_active=True,
     )
     db.add(user)
+    db.flush()
+    resume = (
+        db.query(Resume)
+        .filter(
+            func.lower(Resume.candidate_email) == email,
+            or_(Resume.user_id.is_(None), Resume.user_id == user.id),
+        )
+        .first()
+    )
+    if resume is not None:
+        resume.user_id = user.id
+        resume.expires_at = None
     db.commit()
     db.refresh(user)
     return user
@@ -114,13 +127,21 @@ def login_user(payload: UserLogin, db: Session = Depends(get_db)):
             detail="La cuenta de usuario está inactiva.",
         )
 
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=user.email,
         expires_delta=access_token_expires,
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "email": user.email,
+        "role": user.role,
+    }
 
 
 @router.get("/me", response_model=UserOut)

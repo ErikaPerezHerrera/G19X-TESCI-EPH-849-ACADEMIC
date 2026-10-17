@@ -60,6 +60,7 @@ def test_score_combines_lexical_and_cosine_with_weights():
     assert result["match_details"]["weights_used"]["exact_match_weight"] == 0.6
     assert result["match_details"]["weights_used"]["semantic_match_weight"] == 0.4
     assert result["match_details"]["overqualification"]["over_profile_type"] == "NO"
+    assert "inputs" not in result["ai_analysis"]
 
 
 def test_missing_embeddings_keep_lexical_score_and_mark_semantic_unavailable():
@@ -141,6 +142,7 @@ def test_higher_candidate_qualification_is_detected():
     assert overqualification["is_overqualified"] is False
     assert result["ai_analysis"]["status"] == "unavailable"
     assert overqualification["over_ia_analysis"] is None
+    assert overqualification["over_technical_skills"] == "NO"
 
 
 def test_two_positive_overqualification_signals_set_boolean():
@@ -235,3 +237,45 @@ def test_ai_analysis_is_used_when_gemini_returns_success(monkeypatch):
     assert result["ai_analysis"]["status"] == "success"
     assert result["ai_analysis"]["overqualification_flag"] == "YES"
     assert result["match_details"]["overqualification"]["over_ia_analysis"] == "YES"
+    assert result["match_details"]["overqualification"]["over_technical_skills"] == "YES"
+    assert result["match_details"]["overqualification"]["over_profile_type"] == "YES"
+    assert result["match_details"]["overqualification"]["is_overqualified"] is True
+    assert result["is_overqualified"] is True
+
+
+def test_ai_overqualification_overrides_low_exact_match(monkeypatch):
+    monkeypatch.setattr(
+        matching_engine,
+        "analyze_candidate_compatibility",
+        lambda *_args: {
+            "status": "success",
+            "opinion": "La experiencia supera ampliamente lo requerido.",
+            "pros": ["Experiencia avanzada"],
+            "cons": [],
+            "overqualification_flag": "YES",
+            "overqualification_reason": "Experiencia superior al perfil requerido.",
+        },
+    )
+
+    result = calculate_match(
+        make_job(
+            technical_skills=["Python", "PostgreSQL", "Docker"],
+            profile_type="Junior",
+            embedding=None,
+        ),
+        make_resume(
+            parsed_data={
+                "technical_skills": ["Java"],
+                "professional_title": "Senior Architect",
+            },
+            embedding=None,
+        ),
+    )
+
+    overqualification = result["match_details"]["overqualification"]
+    assert result["match_details"]["exact_match"]["score"] == 0
+    assert overqualification["over_ia_analysis"] == "YES"
+    assert overqualification["over_technical_skills"] == "YES"
+    assert overqualification["over_profile_type"] == "YES"
+    assert overqualification["is_overqualified"] is True
+    assert result["is_overqualified"] is True

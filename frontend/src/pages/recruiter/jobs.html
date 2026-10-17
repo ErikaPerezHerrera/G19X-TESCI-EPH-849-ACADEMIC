@@ -36,6 +36,24 @@
         <h2>Gestión de Vacantes</h2>
       </div>
 
+      <div class="row mb-4">
+        <div class="col-md-8 col-lg-6">
+          <label for="jobSearchInput" class="form-label">Buscar vacantes</label>
+          <div class="input-group shadow-sm">
+            <input
+              type="search"
+              id="jobSearchInput"
+              class="form-control"
+              placeholder="Buscar por cargo, tecnología, área, modalidad, etc..."
+              aria-label="Buscar vacantes por cargo, descripción, área o habilidades"
+            >
+            <button class="btn btn-primary" type="button" id="jobSearchButton">
+              <i class="bi bi-search"></i> Buscar
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Pestañas: Activas / Vencidas / Cerradas -->
       <ul class="nav nav-tabs mb-4" id="jobsTabs" role="tablist">
         <li class="nav-item" role="presentation">
@@ -91,6 +109,15 @@
             <i class="bi bi-arrow-left"></i> Volver a Vacantes
           </button>
           <h2 id="selectedJobTitle" class="mb-0">Candidatos Postulados</h2>
+        </div>
+        <div>
+          <label for="candidateMatchSort" class="form-label small mb-1">Ordenar candidatos</label>
+          <select id="candidateMatchSort" class="form-select form-select-sm">
+            <option value="match">Match total</option>
+            <option value="exact">Coincidencia exacta</option>
+            <option value="semantic">Coincidencia semántica</option>
+            <option value="other">Otras habilidades (menor coincidencia exacta primero)</option>
+          </select>
         </div>
       </div>
 

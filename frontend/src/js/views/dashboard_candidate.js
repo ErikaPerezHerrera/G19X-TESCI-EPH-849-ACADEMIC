@@ -136,23 +136,47 @@ function renderApplicationsTable(apps) {
   // Renderizar filas soportando el modelo Application
   tableBody.innerHTML = apps
     .map(
-      (app) => `
-    <tr>
-      <td class="fw-bold">${app.job?.title || app.job_title || "Vacante sin título"}</td>
-      <td>${app.applied_at ? new Date(app.applied_at).toLocaleDateString("es-ES") : "Reciente"}</td>
-      <td>
-        <span class="badge ${app.match_score >= 70 ? "bg-success" : "bg-warning text-dark"}">
-          ${Math.round(app.match_score || 0)}% Match
-        </span>
-      </td>
-      <td><span class="badge bg-primary">${app.status || "Enviada"}</span></td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-secondary view-job-btn" data-id="${app.id}">
-          <i class="bi bi-eye"></i> Ver
-        </button>
-      </td>
-    </tr>
-  `,
+      (app) => {
+        const detailsId = `candidate-match-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
+        return `
+          <tr>
+            <td class="fw-bold">${escapeHtml(app.job?.title || app.job_title || "Vacante sin título")}</td>
+            <td>${formatApplicationDate(app.applied_at)}</td>
+            <td>
+              <span class="badge ${app.match_score >= 70 ? "bg-success" : "bg-warning text-dark"}">
+                ${Math.round(app.match_score || 0)}% Match
+              </span>
+            </td>
+            <td><span class="badge bg-primary">${escapeHtml(app.status || "Enviada")}</span></td>
+            <td class="text-end">
+              <div class="d-flex flex-wrap justify-content-end gap-1">
+                <button class="btn btn-sm btn-outline-secondary view-job-btn" data-id="${escapeHtml(app.id)}">
+                  <i class="bi bi-eye"></i> Ver vacante
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-primary"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#${detailsId}"
+                  aria-expanded="false"
+                  aria-controls="${detailsId}"
+                >
+                  <i class="bi bi-list-check"></i> Detalles del match
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="5" class="p-0 border-0">
+              <div class="collapse" id="${detailsId}">
+                <div class="card card-body border-0 bg-light m-2">
+                  ${renderApplicationMatchDetails(app)}
+                </div>
+              </div>
+            </td>
+          </tr>
+        `;
+      },
     )
     .join("");
 
@@ -163,6 +187,81 @@ function renderApplicationsTable(apps) {
       openJobModal(appId);
     });
   });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[character];
+  });
+}
+
+function formatApplicationDate(value) {
+  if (!value) return "No disponible";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "No disponible"
+    : date.toLocaleDateString("es-ES");
+}
+
+function formatMatchScore(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return "No disponible";
+  const percentage = score <= 1 ? score * 100 : score;
+  return `${Math.round(percentage * 100) / 100}%`;
+}
+
+function renderMatchSkills(values, emptyMessage) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return `<span class="text-muted">${escapeHtml(emptyMessage)}</span>`;
+  }
+  return values
+    .map(
+      (skill) =>
+        `<span class="badge text-bg-light border me-1 mb-1">${escapeHtml(skill)}</span>`,
+    )
+    .join("");
+}
+
+function renderApplicationMatchDetails(app) {
+  const exact = app.match_details?.exact_match || {};
+  const semantic = app.match_details?.semantic_match || {};
+  const analysis = app.ai_analysis || {};
+  const renderTextList = (items, emptyMessage) => {
+    if (!Array.isArray(items) || items.length === 0) {
+      return `<li class="text-muted">${escapeHtml(emptyMessage)}</li>`;
+    }
+    return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+  };
+
+  return `
+    <div class="row g-3">
+      <div class="col-md-6">
+        <h6>Coincidencia exacta: ${formatMatchScore(exact.score)}</h6>
+        <p class="small fw-semibold mb-1">Habilidades coincidentes</p>
+        <div class="mb-2">${renderMatchSkills(exact.matched_skills, "Ninguna")}</div>
+        <p class="small fw-semibold mb-1">Habilidades faltantes</p>
+        <div class="mb-2">${renderMatchSkills(exact.missing_skills, "Ninguna")}</div>
+        <p class="small fw-semibold mb-1">Otras habilidades</p>
+        <div>${renderMatchSkills(exact.extra_skills, "Ninguna")}</div>
+      </div>
+      <div class="col-md-6">
+        <h6>Coincidencia semántica: ${formatMatchScore(semantic.score)}</h6>
+        <p class="small fw-semibold mb-1">Opinión</p>
+        <p class="small">${escapeHtml(analysis.opinion || "Análisis no disponible.")}</p>
+        <p class="small fw-semibold mb-1">Fortalezas</p>
+        <ul class="small mb-2">${renderTextList(analysis.pros, "No disponibles.")}</ul>
+        <p class="small fw-semibold mb-1">Riesgos / contras</p>
+        <ul class="small mb-0">${renderTextList(analysis.cons, "No disponibles.")}</ul>
+      </div>
+    </div>
+  `;
 }
 
 // Función para poblar y abrir el Modal con el detalle de la vacante

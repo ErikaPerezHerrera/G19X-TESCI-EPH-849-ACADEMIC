@@ -70,3 +70,5 @@ class Token(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
+    email: EmailStr | None = None
+    role: Literal["casual", "registered", "recruiter", "admin"] | None = None

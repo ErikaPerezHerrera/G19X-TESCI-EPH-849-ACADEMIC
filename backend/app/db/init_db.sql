@@ -264,7 +264,8 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     UPDATE resumes
-    SET user_id = NEW.id
+    SET user_id = NEW.id,
+        expires_at = NULL
     WHERE LOWER(candidate_email) = LOWER(NEW.email)
       AND user_id IS NULL;
 
@@ -310,6 +311,12 @@ VALUES
         'application_received',
         'Tu postulación fue recibida',
         'Hola {{candidate_name}}, hemos recibido tu postulación para {{job_title}}. En breve revisaremos tu perfil y te contactaremos si avanzas en el proceso.',
+        TRUE
+    ),
+    (
+        'cv_readed',
+        'Tu perfil fue visto',
+        'Hola {{candidate_name}}, hemos visto el CV que preparaste para {{job_title}}. Te invitamos a seguir pendiente del avance de tu proceso.',
         TRUE
     ),
     (

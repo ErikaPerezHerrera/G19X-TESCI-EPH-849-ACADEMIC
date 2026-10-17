@@ -1,10 +1,10 @@
 import { API_BASE_URL } from "./config.js";
 
 window.addEventListener("pageshow", (event) => {
-  if (
-    event.persisted ||
-    (window.performance && window.performance.navigation.type === 2)
-  ) {
+  const isProtectedPage =
+    window.location.pathname.includes("/recruiter/") ||
+    window.location.pathname.includes("/candidate/");
+  if (event.persisted && isProtectedPage) {
     const token = localStorage.getItem("access_token");
     if (!token) {
       window.location.replace("../login.html");
@@ -45,8 +45,12 @@ document.addEventListener("DOMContentLoaded", () => {
     loginForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const email = document.getElementById("loginEmail").value.trim();
+      const email = document
+        .getElementById("loginEmail")
+        .value.trim()
+        .toLowerCase();
       const password = document.getElementById("loginPassword").value;
+      const submitButton = loginForm.querySelector('button[type="submit"]');
 
       let errorMessage = document.getElementById("errorMessage");
       if (!errorMessage) {
@@ -59,41 +63,60 @@ document.addEventListener("DOMContentLoaded", () => {
         errorMessage.innerText = "";
       }
 
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.setAttribute("aria-busy", "true");
+      }
+
+      let sessionStarted = false;
       try {
         const response = await fetch(`${API_BASE_URL}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          const errorData = await response.json();
           const message =
-            typeof errorData.detail === "object"
-              ? JSON.stringify(errorData.detail)
-              : errorData.detail || "Correo o contraseña incorrectos.";
+            typeof data.detail === "object"
+              ? JSON.stringify(data.detail)
+              : data.detail || "Correo o contraseña incorrectos.";
           throw new Error(message);
         }
 
-        const data = await response.json();
+        if (!data.access_token) {
+          throw new Error("El servidor no devolvió un token de acceso válido.");
+        }
         localStorage.setItem("access_token", data.access_token);
+        sessionStarted = true;
 
-        let userRole = data.user?.role || data.role;
-        let userEmail = data.user?.email || data.email;
+        let userRole = data.user?.role || data.role || null;
+        let userEmail = data.user?.email || data.email || null;
 
         if (!userRole || !userEmail) {
           const profileResponse = await fetch(`${API_BASE_URL}/users/me`, {
             headers: { Authorization: `Bearer ${data.access_token}` },
           });
-          if (profileResponse.ok) {
-            const profileData = await profileResponse.json();
-            userRole = userRole || profileData.role;
-            userEmail = userEmail || profileData.email;
+          const profileData = await profileResponse.json().catch(() => ({}));
+          if (!profileResponse.ok) {
+            throw new Error(
+              profileData.detail ||
+                "Se inició sesión, pero no se pudo cargar el perfil. Inténtalo nuevamente.",
+            );
           }
+          userRole = userRole || profileData.role;
+          userEmail = userEmail || profileData.email;
         }
 
-        if (userRole) localStorage.setItem("user_role", userRole);
-        if (userEmail) localStorage.setItem("user_email", normalizeUserEmail(userEmail));
+        if (!userRole || !userEmail) {
+          throw new Error(
+            "El servidor autenticó la cuenta, pero no devolvió el rol o correo del usuario.",
+          );
+        }
+
+        localStorage.setItem("user_role", userRole);
+        localStorage.setItem("user_email", normalizeUserEmail(userEmail));
 
         // REDIRECCIONES LIMPIAS
         if (userRole === "recruiter" || userRole === "admin") {
@@ -102,9 +125,22 @@ document.addEventListener("DOMContentLoaded", () => {
           window.location.href = "candidate/dashboard.html";
         }
       } catch (error) {
+        if (sessionStarted) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("user_role");
+          localStorage.removeItem("user_email");
+        }
         console.error("Error durante el inicio de sesión:", error);
-        errorMessage.innerText = error.message;
+        errorMessage.textContent =
+          error instanceof TypeError
+            ? "No se pudo conectar con el servidor. Verifica que la API esté disponible e inténtalo nuevamente."
+            : error.message || "No se pudo iniciar sesión.";
         errorMessage.classList.remove("d-none");
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.removeAttribute("aria-busy");
+        }
       }
     });
   }
