@@ -116,14 +116,6 @@ def _skills(
     return result
 
 
-def _embedding_values(embedding: Any) -> list[float] | None:
-    try:
-        values = [float(value) for value in embedding]
-    except (TypeError, ValueError):
-        return None
-    return values if len(values) == EMBEDDING_DIMENSION else None
-
-
 def _cosine_similarity(left: Any, right: Any) -> float | None:
     try:
         left_values = [float(value) for value in left]
@@ -194,9 +186,6 @@ def _profile_overqualification(
 def _fetch_ai_candidate_analysis(
     job: Job,
     resume: Resume,
-    *,
-    job_skills: dict[str, str],
-    candidate_skills: dict[str, str],
 ) -> tuple[dict[str, Any], str, str | None]:
     parsed_data = resume.parsed_data or {}
     try:
@@ -238,16 +227,6 @@ def _fetch_ai_candidate_analysis(
         analysis.get("overqualification_reason")
         or OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_reason"]
     ).strip() or OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_reason"]
-    normalized["inputs"] = {
-        "technical_skills": {
-            "job": list(job_skills.values()),
-            "candidate": list(candidate_skills.values()),
-        },
-        "job_description": job.description,
-        "experience": _plain_text(parsed_data.get("work_experience")),
-        "job_embedding": _embedding_values(job.embedding),
-        "resume_embedding": _embedding_values(resume.embedding),
-    }
     return normalized, ai_flag, normalized["overqualification_reason"]
 
 
@@ -295,29 +274,21 @@ def calculate_match(
         job.profile_type,
         parsed_data.get("professional_title"),
     )
-    ai_analysis, ai_flag, ai_reason = _fetch_ai_candidate_analysis(
-        job,
-        resume,
-        job_skills=job_skills,
-        candidate_skills=candidate_skills,
-    )
+    ai_analysis, ai_flag, ai_reason = _fetch_ai_candidate_analysis(job, resume)
+    ai_analysis_available = ai_analysis.get("status") == "success"
+    ai_overqualification_override = ai_analysis_available and ai_flag == "YES"
+    if ai_overqualification_override:
+        technical_overqualification = "YES"
+        profile_overqualification = "YES"
+
     overqualification_flags = (
         technical_overqualification,
         profile_overqualification,
-        ai_flag,
+        ai_flag if ai_analysis_available else None,
     )
-    is_overqualified = sum(flag == "YES" for flag in overqualification_flags) >= 2
-
-    ai_analysis["inputs"] = {
-        "technical_skills": {
-            "job": list(job_skills.values()),
-            "candidate": list(candidate_skills.values()),
-        },
-        "job_description": job.description,
-        "experience": _plain_text(parsed_data.get("work_experience")),
-        "job_embedding": _embedding_values(job.embedding),
-        "resume_embedding": _embedding_values(resume.embedding),
-    }
+    is_overqualified = (
+        ai_analysis_available and ai_flag == "YES"
+    ) or sum(flag == "YES" for flag in overqualification_flags) >= 2
 
     return {
         "match_score": round(score * 100, 2),
@@ -373,15 +344,23 @@ def calculate_match(
             "overqualification": {
                 "over_technical_skills": technical_overqualification,
                 "over_profile_type": profile_overqualification,
-                "over_ia_analysis": ai_flag if ai_analysis.get("status") == "success" else None,
+                "over_ia_analysis": ai_flag if ai_analysis_available else None,
                 "is_overqualified": is_overqualified,
                 "details": {
                     "technical_reason": (
-                        f"{len(matched_keys)}/{len(job_skills)} habilidades "
-                        f"requeridas coinciden y hay {len(extra_keys)} habilidades "
-                        "técnicas adicionales."
+                        f"Marcado por sobrecalificación positiva de IA: {ai_reason}"
+                        if ai_overqualification_override
+                        else (
+                            f"{len(matched_keys)}/{len(job_skills)} habilidades "
+                            f"requeridas coinciden y hay {len(extra_keys)} habilidades "
+                            "técnicas adicionales."
+                        )
                     ),
-                    "profile_reason": profile_reason,
+                    "profile_reason": (
+                        f"Marcado por sobrecalificación positiva de IA: {ai_reason}"
+                        if ai_overqualification_override
+                        else profile_reason
+                    ),
                     "ia_reason": ai_reason,
                 },
             },

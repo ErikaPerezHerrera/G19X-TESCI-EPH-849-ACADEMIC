@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine, get_db
@@ -24,8 +23,6 @@ from app.models.resume import Resume  # noqa: F401
 from app.models.skill_cache import SkillCache  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.services.skill_cache_service import backfill_missing_skill_embeddings
-
-from app.api.v1.endpoints import applications
 
 # Inicialización de la aplicación FastAPI
 app = FastAPI(
@@ -45,8 +42,6 @@ if settings.BACKEND_CORS_ORIGINS:
 
 # Inclusión de las rutas de la versión 1 de la API (/api/v1)
 app.include_router(api_router, prefix=settings.API_V1_STR)
-app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth")
-app.include_router(applications.router, prefix="/api/v1", tags=["applications"])
 
 
 def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
@@ -82,6 +77,22 @@ def startup_event() -> None:
         with engine.begin() as conn:
             conn.execute(
                 text("ALTER TYPE job_status_enum ADD VALUE IF NOT EXISTS 'expired'")
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE applications
+                    SET ai_analysis = ai_analysis
+                        #- '{job_embedding}'
+                        #- '{resume_embedding}'
+                        #- '{inputs,job_embedding}'
+                        #- '{inputs,resume_embedding}'
+                    WHERE ai_analysis ? 'job_embedding'
+                       OR ai_analysis ? 'resume_embedding'
+                       OR COALESCE(ai_analysis #> '{inputs}', '{}'::jsonb) ? 'job_embedding'
+                       OR COALESCE(ai_analysis #> '{inputs}', '{}'::jsonb) ? 'resume_embedding'
+                    """
+                )
             )
         with SessionLocal() as db:
             try:

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -72,6 +73,7 @@ class ApplicationOut(BaseModel):
         "rejected",
         "hired",
     ]
+    applied_at: datetime | None = None
     match_score: float | None = Field(None, ge=0, le=100)
     is_overqualified: bool = False
     ai_analysis: dict = Field(

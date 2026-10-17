@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Almacén local de vacantes cargadas para acceso rápido
   let currentJobs = [];
+  let currentCandidateApplications = [];
 
   // 1. Verificación de autenticación
   if (!token) {
@@ -84,6 +85,41 @@ document.addEventListener("DOMContentLoaded", async () => {
   const jobsSection = document.getElementById("jobsSection");
   const candidatesSection = document.getElementById("candidatesSection");
   const backToJobsBtn = document.getElementById("backToJobsBtn");
+  const candidatesSortSelect = document.getElementById("candidateMatchSort");
+  candidatesSortSelect?.addEventListener("change", renderCandidateCards);
+  const jobSearchInput = document.getElementById("jobSearchInput");
+  const filterJobs = () => {
+    const query = (jobSearchInput?.value || "").trim().toLocaleLowerCase();
+    if (!query) {
+      renderJobs(currentJobs);
+      return;
+    }
+
+    const filteredJobs = currentJobs.filter((job) => {
+      const searchableText = [
+        job.title,
+        job.description,
+        job.area,
+        job.profile_type,
+        job.modality,
+        job.location,
+        ...(Array.isArray(job.technical_skills) ? job.technical_skills : []),
+        ...(Array.isArray(job.soft_skills) ? job.soft_skills : []),
+      ]
+        .filter((value) => typeof value === "string")
+        .join(" ")
+        .toLocaleLowerCase();
+      return searchableText.includes(query);
+    });
+    renderJobs(filteredJobs);
+  };
+  document
+    .getElementById("jobSearchButton")
+    ?.addEventListener("click", filterJobs);
+  jobSearchInput?.addEventListener("input", filterJobs);
+  jobSearchInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") filterJobs();
+  });
 
   // Modales Bootstrap
   const cvDetailModalElement = document.getElementById("cvDetailModal");
@@ -485,18 +521,73 @@ document.addEventListener("DOMContentLoaded", async () => {
         })
       );
 
-      appsWithResume.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
-
-      container.innerHTML = appsWithResume
-        .map((app) => createCandidateCard(app))
-        .join("");
-
-      attachCandidateEventListeners();
+      currentCandidateApplications = appsWithResume;
+      renderCandidateCards();
     } catch (error) {
       console.error("Error al cargar candidatos:", error);
       container.innerHTML =
         '<div class="alert alert-danger">Error al cargar la lista de candidatos.</div>';
     }
+  }
+
+  function renderCandidateCards() {
+    const container = document.getElementById("candidatesList");
+    if (!container) return;
+    const sortMode = candidatesSortSelect?.value || "match";
+    const applications = [...currentCandidateApplications];
+
+    applications.sort((left, right) => {
+      const leftDetails = left.match_details || {};
+      const rightDetails = right.match_details || {};
+      const leftExact = Number(leftDetails.exact_match?.score ?? -1);
+      const rightExact = Number(rightDetails.exact_match?.score ?? -1);
+      const leftSemantic = Number(leftDetails.semantic_match?.score ?? -1);
+      const rightSemantic = Number(rightDetails.semantic_match?.score ?? -1);
+
+      if (sortMode === "exact") return rightExact - leftExact;
+      if (sortMode === "semantic") return rightSemantic - leftSemantic;
+      if (sortMode === "other") {
+        const exactDifference = leftExact - rightExact;
+        if (exactDifference !== 0) return exactDifference;
+        return (
+          (rightDetails.exact_match?.extra_skills?.length || 0) -
+          (leftDetails.exact_match?.extra_skills?.length || 0)
+        );
+      }
+      return Number(right.match_score || 0) - Number(left.match_score || 0);
+    });
+
+    container.innerHTML = applications.map(createCandidateCard).join("");
+    attachCandidateEventListeners();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (character) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+      return entities[character];
+    });
+  }
+
+  function renderSkillList(values, emptyLabel) {
+    if (!Array.isArray(values) || values.length === 0) {
+      return `<span class="text-muted">${escapeHtml(emptyLabel)}</span>`;
+    }
+    return values
+      .map((value) => `<span class="badge text-bg-light border me-1 mb-1">${escapeHtml(value)}</span>`)
+      .join("");
+  }
+
+  function formatMatchScore(value) {
+    const score = Number(value);
+    return Number.isFinite(score)
+      ? `${Math.round((score <= 1 ? score * 100 : score) * 100) / 100}%`
+      : "No disponible";
   }
 
   function createCandidateCard(app) {
@@ -530,24 +621,49 @@ document.addEventListener("DOMContentLoaded", async () => {
       parsed.title ||
       parsed.titulo ||
       "Sin título especificado";
+    const details = app.match_details || {};
+    const exactMatch = details.exact_match || {};
+    const semanticMatch = details.semantic_match || {};
+    const aiAnalysis = app.ai_analysis || {};
+    const overqualification = details.overqualification || {};
+    const detailsId = `match-details-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
+    const overqualificationId = `overqualification-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
+    const matchPros = renderSkillList(aiAnalysis.pros, "Sin puntos fuertes disponibles.");
+    const matchCons = renderSkillList(aiAnalysis.cons, "Sin riesgos disponibles.");
+    const overqualificationRow = (label, flag, reason) => `
+      <div class="mb-2">
+        <strong>${label}:</strong> ${flag === "YES" ? "SÍ" : "NO"}
+        <div class="small text-muted">${escapeHtml(reason || "Sin detalle disponible.")}</div>
+      </div>
+    `;
 
     return `
       <div class="card border-0 shadow-sm ${isRejected ? "opacity-50 bg-light" : ""}">
         <div class="card-body d-flex justify-content-between align-items-center">
           <div>
-            <h6 class="fw-bold mb-1">${candidateName}</h6>
+            <h6 class="fw-bold mb-1">${escapeHtml(candidateName)}</h6>
             <p class="text-muted small mb-1">
-              <i class="bi bi-envelope"></i> ${candidateEmail} | 
-              <i class="bi bi-briefcase"></i> ${professionalTitle}
+              <i class="bi bi-envelope"></i> ${escapeHtml(candidateEmail)} |
+              <i class="bi bi-briefcase"></i> ${escapeHtml(professionalTitle)}
             </p>
             <span class="badge ${badgeBg}">Match: ${score}%</span>
             ${isRejected ? '<span class="badge bg-secondary ms-1">Descartado</span>' : ""}
           </div>
 
-          <div class="d-flex gap-2">
+          <div class="d-flex flex-wrap justify-content-end gap-2">
             <button class="btn btn-outline-info btn-sm view-cv-btn" data-resume-id="${app.resume_id}">
               <i class="bi bi-file-earmark-person"></i> Ver CV
             </button>
+            <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#${detailsId}" aria-expanded="false" aria-controls="${detailsId}">
+              <i class="bi bi-list-check"></i> Detalles del match
+            </button>
+            ${
+              app.is_overqualified === true
+                ? `<button class="btn btn-outline-warning btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#${overqualificationId}" aria-expanded="false" aria-controls="${overqualificationId}">
+                    <i class="bi bi-exclamation-triangle"></i> Ver sobrecalificado
+                  </button>`
+                : ""
+            }
             ${
               !isRejected
                 ? `
@@ -559,6 +675,42 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
           </div>
         </div>
+        <div class="collapse border-top" id="${detailsId}">
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <h6>Coincidencia exacta: ${formatMatchScore(exactMatch.score)}</h6>
+                <p class="small mb-1"><strong>Habilidades coincidentes</strong></p>
+                <div class="mb-2">${renderSkillList(exactMatch.matched_skills, "Ninguna")}</div>
+                <p class="small mb-1"><strong>Habilidades faltantes</strong></p>
+                <div class="mb-2">${renderSkillList(exactMatch.missing_skills, "Ninguna")}</div>
+                <p class="small mb-1"><strong>Otras habilidades</strong></p>
+                <div>${renderSkillList(exactMatch.extra_skills, "Ninguna")}</div>
+              </div>
+              <div class="col-md-6">
+                <h6>Coincidencia semántica: ${formatMatchScore(semanticMatch.score)}</h6>
+                <h6 class="mt-3">Opinión de IA</h6>
+                <p class="small">${escapeHtml(aiAnalysis.opinion || "Análisis no disponible.")}</p>
+                <p class="small fw-semibold mb-1">Fortalezas</p>
+                <div class="mb-2">${matchPros}</div>
+                <p class="small fw-semibold mb-1">Riesgos / contras</p>
+                <div>${matchCons}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        ${
+          app.is_overqualified === true
+            ? `<div class="collapse border-top" id="${overqualificationId}">
+                <div class="card-body">
+                  <h6 class="fw-bold">Señales de sobrecalificación</h6>
+                  ${overqualificationRow("Análisis de IA", overqualification.over_ia_analysis, overqualification.details?.ia_reason)}
+                  ${overqualificationRow("Tipo de perfil", overqualification.over_profile_type, overqualification.details?.profile_reason)}
+                  ${overqualificationRow("Habilidades técnicas", overqualification.over_technical_skills, overqualification.details?.technical_reason)}
+                </div>
+              </div>`
+            : ""
+        }
       </div>
     `;
   }
