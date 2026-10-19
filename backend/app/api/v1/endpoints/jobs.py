@@ -1,15 +1,19 @@
 from datetime import datetime, timezone
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_recruiter, get_current_user
+from app.core.security import get_current_recruiter
+
 from app.models.application import Application
 from app.models.job import Job
 from app.models.user import User
+
 from app.schemas.job import JobCreate, JobDraftRequest, JobOut, JobReopen
 
 from app.services.gemini_service import generate_job_draft_with_status
@@ -22,7 +26,7 @@ from app.services.matching_engine import recalculate_job_applications
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-
+## Función para sincronizar el estado de las vacantes vencidas
 def _sync_expired_jobs(db: Session) -> None:
     db.execute(
         text(
@@ -32,7 +36,7 @@ def _sync_expired_jobs(db: Session) -> None:
     )
     db.commit()
 
-
+## Ruta para listar vacantes con opción de filtrar por estado
 @router.get("", response_model=list[JobOut])
 def list_jobs(
     status_filter: Optional[str] = Query(default=None, alias="status"),
@@ -44,7 +48,7 @@ def list_jobs(
         query = query.filter(Job.status == status_filter)
     return query.order_by(Job.created_at.desc()).all()
 
-
+## Ruta para crear un borrador de vacante usando la API de Gemini
 @router.post("/draft")
 def draft_job(
     payload: JobDraftRequest,
@@ -64,7 +68,7 @@ def draft_job(
         source_text=source_text,
     )
 
-
+## Ruta para obtener los detalles de una vacante específica
 @router.get("/{job_id}", response_model=JobOut)
 def get_job(job_id: str, db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -72,6 +76,7 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
     return job
 
+## Ruta para crear una nueva vacante
 @router.post("", response_model=JobOut, status_code=status.HTTP_201_CREATED)
 def create_job(
     payload: JobCreate,
@@ -118,8 +123,7 @@ def create_job(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                f"La vacante {job.id} se creó, pero no se pudo generar su embedding: "
-                f"{exc}"
+                f"La vacante se creó, pero no se pudo generar su embedding: "
             ),
         ) from exc
 
@@ -131,15 +135,19 @@ def create_job(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                f"La vacante {job.id} se creó, pero no se pudo guardar su embedding."
+                f"La vacante se creó, pero no se pudo guardar su embedding."
             ),
         ) from exc
 
     return job
 
-
+## Ruta para cerrar una vacante y eliminar sus postulaciones asociadas
 @router.patch("/{job_id}/close", response_model=JobOut)
-def close_job(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_recruiter)):
+def close_job(
+    job_id: str, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_recruiter)
+):
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
@@ -150,18 +158,20 @@ def close_job(job_id: str, db: Session = Depends(get_db), current_user: User = D
     db.refresh(job)
     return job
 
-
+## Ruta para reabrir una vacante cerrada o vencida
 @router.patch("/{job_id}/reopen", response_model=JobOut)
 def reopen_job(
     job_id: str,
     payload: JobReopen,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-):
+):  
+    # Valida que la vacante existe
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
 
+    # Valida que la vacante esté vencida, revisa que tenga una nueva fecha límite
     reopening_closed_job = job.status == "closed"
     if job.status == "expired":
         if payload.model_fields_set != {"deadline"} or payload.deadline is None:
@@ -170,6 +180,7 @@ def reopen_job(
                 detail="Para reabrir una vacante vencida solo puedes indicar una nueva fecha límite.",
             )
 
+        # La fecha límite debe ser futura, aunque podría no tener fecha límite
         deadline = payload.deadline
         if deadline.tzinfo is None:
             deadline = deadline.replace(tzinfo=timezone.utc)
@@ -180,6 +191,8 @@ def reopen_job(
             )
 
         job.deadline = deadline
+    # pero si la vacante está cerrada pide información nueva para reabrirla, y valida que se hayan completado todos los campos requeridos
+    ## La información puede ser la misma que la vacante tenía anteriormente, solo que en este caso sí se puede editar
     elif job.status == "closed":
         required_fields = {
             "title",
@@ -206,9 +219,10 @@ def reopen_job(
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(exc),
+                detail="Error al validar los datos de la vacante.",
             ) from exc
 
+        # La fecha límite debe ser futura, aunque podría no tener fecha límite
         deadline = values.deadline
         if deadline is not None:
             if deadline.tzinfo is None:
@@ -219,9 +233,11 @@ def reopen_job(
                     detail="La fecha límite debe ser futura.",
                 )
 
+        # Revisa que las habilidades estén en la tabla de habilidades o si existen, o crearlas
         ensure_skills_cached(
             db, values.technical_skills + values.soft_skills
         )
+
         job.title = values.title
         job.area = values.area
         job.profile_type = values.profile_type
@@ -238,6 +254,7 @@ def reopen_job(
             detail="Solo se pueden reabrir vacantes cerradas o vencidas.",
         )
 
+    # Actualiza el estado de la vacante a activa y guarda los cambios en la base de datos
     job.status = "active"
     try:
         db.commit()
@@ -249,6 +266,7 @@ def reopen_job(
             detail="No se pudo reabrir la vacante.",
         ) from exc
 
+    # Si se reabre una vacante CERRADA, se genera un nuevo embedding para la vacante y se recalcula el matching de sus postulaciones
     if reopening_closed_job:
         try:
             job_text_with_prompt = (
@@ -261,8 +279,8 @@ def reopen_job(
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=(
-                    f"La vacante {job.id} se reabrió, pero no se pudo generar "
-                    f"su embedding: {exc}"
+                    f"La vacante se reabrió, pero no se pudo generar "
+                    f"su embedding."
                 ),
             ) from exc
 
@@ -274,7 +292,7 @@ def reopen_job(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=(
-                    f"La vacante {job.id} se reabrió, pero no se pudo guardar "
+                    f"La vacante se reabrió, pero no se pudo guardar "
                     "su embedding."
                 ),
             ) from exc
@@ -286,7 +304,7 @@ def reopen_job(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                f"La vacante {job.id} se reabrió, pero no se pudo recalcular "
+                f"La vacante se reabrió, pero no se pudo recalcular "
                 "el matching de sus postulaciones."
             ),
         ) from exc

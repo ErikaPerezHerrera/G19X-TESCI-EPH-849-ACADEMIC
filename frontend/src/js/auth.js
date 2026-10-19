@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "./config.js";
 
+// Protege las páginas con las que los usuarios pueden interactuar, pidiendo el token de inicio de sesión, o redirige a index
 window.addEventListener("pageshow", (event) => {
   const isProtectedPage =
     window.location.pathname.includes("/recruiter/") ||
@@ -16,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginForm = document.getElementById("loginForm");
   const signupForm = document.getElementById("signupForm");
 
-  // Autocompletar el correo y el nombre en el formulario de registro si viene parametrizado (?email=...&name=...)
+  // Si es un registro de usuario, usa autocompletar el correo y el nombre en el formulario de registro si viene parametrizado (?email=...&name=...)
   if (signupForm) {
     const urlParams = new URLSearchParams(window.location.search);
     const emailParam = urlParams.get("email");
@@ -118,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("user_role", userRole);
         localStorage.setItem("user_email", normalizeUserEmail(userEmail));
 
-        // REDIRECCIONES LIMPIAS
+        // Redirecciones limpias al iniciar sesión
         if (userRole === "recruiter" || userRole === "admin") {
           window.location.href = "recruiter/jobs.html";
         } else {
@@ -130,7 +131,6 @@ document.addEventListener("DOMContentLoaded", () => {
           localStorage.removeItem("user_role");
           localStorage.removeItem("user_email");
         }
-        console.error("Error durante el inicio de sesión:", error);
         errorMessage.textContent =
           error instanceof TypeError
             ? "No se pudo conectar con el servidor. Verifica que la API esté disponible e inténtalo nuevamente."
@@ -189,7 +189,6 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.");
         window.location.href = "login.html";
       } catch (error) {
-        console.error("Error durante el registro:", error);
         errorMessage.innerText = error.message;
         errorMessage.classList.remove("d-none");
       }
@@ -225,6 +224,7 @@ function normalizeUserEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+// Intenta consultar quien es el usuario actual y si está autenticado
 async function fetchCurrentUserProfile(token = localStorage.getItem("access_token")) {
   if (!token) return null;
 
@@ -237,11 +237,11 @@ async function fetchCurrentUserProfile(token = localStorage.getItem("access_toke
     const profile = await response.json();
     return profile || null;
   } catch (error) {
-    console.error("No se pudo obtener el perfil del usuario:", error);
     return null;
   }
 }
 
+// recupera, verifica y normaliza el correo electrónico del usuario autenticado utilizando el almacenamiento local del navegador
 async function hydrateUserSessionInfo() {
   const token = localStorage.getItem("access_token");
   if (!token) return null;
@@ -259,6 +259,7 @@ async function hydrateUserSessionInfo() {
   return null;
 }
 
+// Revisa que el email del usuario actual sea el mismo que el del CV
 async function validateCandidateEmailForCurrentUser(candidateEmail) {
   const expectedEmail = await hydrateUserSessionInfo();
   const actualEmail = normalizeUserEmail(candidateEmail);

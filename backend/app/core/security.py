@@ -1,28 +1,28 @@
-## Este es el módulo central de seguridad y autenticación de la aplicación.
-# #Se encarga de tres cosas fundamentales:
+## Módulo central de seguridad y autenticación (PluriJob)
+# Se encarga de tres cosas fundamentales:
 # - encriptar y verificar contraseñas con bcrypt,
 # - firmar y decodificar tokens JWT (JSON Web Tokens),
 # - y proveer las dependencias que protegen tus rutas en FastAPI según el rol del usuario.
-## Módulo central de seguridad y autenticación (PluriJob)
+
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
+
 from app.models.user import User
 
 # Esquema de autenticación Bearer Token de FastAPI.
 security_scheme = HTTPBearer(auto_error=False)
 
-
-# --- 1. ENCRIPTACIÓN DE CONTRASEÑAS (Bcrypt Nativo) ---
-
-
+## Gestión de contraseñas y tokens
 def hash_password(password: str) -> str:
     """
     Genera un hash seguro utilizando bcrypt directamente.
@@ -40,9 +40,7 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
-# --- 2. GESTIÓN DE TOKENS JWT (PyJWT) ---
-
-
+## Gestión de tokens JWT
 def create_access_token(subject: str, expires_delta: timedelta | None = None) -> str:
     """
     Genera un token JWT firmado mediante HS256.
@@ -76,9 +74,7 @@ def decode_access_token(token: str) -> str:
         raise ValueError("Token inválido o expirado") from exc
 
 
-# --- 3. DEPENDENCIAS DE SEGURIDAD Y ROLES (FastAPI Guards) ---
-
-
+## Busqueda de usuario actual registrado o establece una visita anónima
 def get_optional_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
     db: Session = Depends(get_db),
@@ -101,13 +97,13 @@ def get_optional_current_user(
     # Busca por email
     user = db.query(User).filter(User.email == identifier).first()
 
-    # Si no lo encuentra por email, intenta buscar por UUID id (si decidieras usar ID como sub)
+    # Si no lo encuentra por email, intenta buscar por UUID id
     if user is None:
         try:
             user = db.query(User).filter(User.id == identifier).first()
         except Exception:
             pass
-
+    # Si el usuario no es encontrado o no está activo lanza un error de acceso no autorizado
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -117,7 +113,7 @@ def get_optional_current_user(
 
     return user
 
-
+## Revisión de permiso de acceso autenticado
 def get_current_user(
     current_user: User | None = Depends(get_optional_current_user),
 ) -> User:
@@ -129,7 +125,7 @@ def get_current_user(
         )
     return current_user
 
-
+## Guardia de acceso para rol Administrador
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     """
     Guardia que restringe el acceso únicamente a administradores.
@@ -141,7 +137,7 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
         )
     return current_user
 
-
+## Guardia de acceso para rol Reclutador
 def get_current_recruiter(current_user: User = Depends(get_current_user)) -> User:
     """
     Guardia que permite acceso a reclutadores y administradores.
@@ -153,7 +149,7 @@ def get_current_recruiter(current_user: User = Depends(get_current_user)) -> Use
         )
     return current_user
 
-
+## Guardia de acceso para rol Registrado o Casual
 def get_current_candidate(current_user: User = Depends(get_current_user)) -> User:
     """
     Guardia que restringe el acceso a usuarios postulantes ('registered' o 'casual').

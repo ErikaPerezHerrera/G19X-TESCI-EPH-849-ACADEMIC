@@ -1,7 +1,4 @@
 # Este código define el modelo ORM de SQLAlchemy para la entidad Job (Vacantes de Empleo).
-# Es una de las tablas centrales del sistema, pues almacena las ofertas publicadas por los reclutadores
-# con sus requerimientos, modalidades y fechas límite.
-
 import uuid
 
 from pgvector.sqlalchemy import Vector
@@ -18,13 +15,15 @@ class Job(Base):
     Almacena las ofertas laborales o vacantes creadas por los reclutadores,
     incluyendo detalles del puesto, requerimientos (skills) y estado de la vacante.
     """
-
+    # Indices y restricciones adicionales para optimizar las búsquedas y la gestión de vacantes
     __tablename__ = "jobs"
     __table_args__ = (
+        # Valida en base de datos que la fecha límite (deadline) sea posterior a la fecha de creación (created_at)
         CheckConstraint(
             "deadline IS NULL OR deadline > created_at",
             name="chk_jobs_deadline_after_creation",
         ),
+        # Valida en base de datos que la ubicación (location) no sea nula ni vacía si la modalidad no es 'remoto'
         CheckConstraint(
             "modality = 'remoto' OR NULLIF(BTRIM(location), '') IS NOT NULL",
             name="chk_jobs_location_by_modality",

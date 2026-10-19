@@ -1,3 +1,4 @@
+# Este código define la capa de Esquemas Pydantic para la gestión de Postulaciones (Application).
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -9,11 +10,7 @@ from app.schemas.job import JobOut
 from app.schemas.resume import ResumeOut  # <-- Importado para serializar app.resume en la tarjeta del candidato
 
 
-# ==========================================
-# ESQUEMAS DE ENTRADA (SOLICITUDES / REQUESTS)
-# ==========================================
-
-
+## Esquema de entrada (Input) para crear una nueva postulación a una vacante
 class ApplicationCreate(BaseModel):
     """
     Datos requeridos para crear una nueva postulación a una vacante.
@@ -37,7 +34,7 @@ class ApplicationCreate(BaseModel):
         description="Puntuación inicial calculada antes de persistir",
     )
 
-
+## Esquema de entrada (Input) para actualizar el estado de una postulación a Rejected
 class ApplicationReject(BaseModel):
     """
     Esquema para recibir el motivo del descarte por parte del reclutador.
@@ -48,18 +45,12 @@ class ApplicationReject(BaseModel):
         description="Motivo opcional del descarte especificado por el reclutador",
     )
 
-
-# ==========================================
-# ESQUEMAS DE RESPUESTA (RESPONSES)
-# ==========================================
-
-
+## Esquema de salida (Output) para representar una postulación completa
 class ApplicationOut(BaseModel):
     """
     Estructura completa de la postulación entregada al cliente o reclutador.
     Incluye la auditoría de matching (match_details) y el análisis de sobrecalificación.
     """
-
     id: UUID
     job_id: UUID
     user_id: UUID | None = None

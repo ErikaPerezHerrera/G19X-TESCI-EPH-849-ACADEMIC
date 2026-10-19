@@ -52,11 +52,11 @@ document.addEventListener("DOMContentLoaded", () => {
 // Funciones del Dashboard (dashboard.html)
 // -------------------------------------------------------------
 
+// Caargar las postulaciones del usuario autenticado
 async function loadDashboardData() {
   const token = localStorage.getItem("access_token");
 
   try {
-    // Obtener SOLO las postulaciones del usuario autenticado
     const response = await fetch(`${API_BASE_URL}/applications/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -94,7 +94,7 @@ async function loadDashboardData() {
       }
     }
   } catch (error) {
-    console.error("Error al cargar dashboard:", error);
+    console.error("Error al cargar dashboard.");
     const tableBody = document.getElementById("applicationsTableBody");
     if (tableBody) {
       tableBody.innerHTML = `
@@ -108,6 +108,7 @@ async function loadDashboardData() {
   }
 }
 
+// Cargar la tabla con postulaciones del candidato
 function renderApplicationsTable(apps) {
   const tableBody = document.getElementById("applicationsTableBody");
   const statApplications = document.getElementById("statApplications");
@@ -128,7 +129,7 @@ function renderApplicationsTable(apps) {
     return;
   }
 
-  // Calcular Match Promedio
+  // Calcular Match Promedio en base a los matchs de sus postulaciones
   const totalMatch = apps.reduce((acc, app) => acc + (app.match_score || 0), 0);
   const avgMatch = Math.round(totalMatch / apps.length);
   if (statAvgMatch) statAvgMatch.textContent = `${avgMatch}%`;
@@ -200,8 +201,9 @@ function escapeHtml(value) {
     };
     return entities[character];
   });
-}
+  }
 
+/// Formatos de los datos mostrados en la tabla del dashboard
 function formatApplicationDate(value) {
   if (!value) return "No disponible";
   const date = new Date(value);
@@ -229,6 +231,7 @@ function renderMatchSkills(values, emptyMessage) {
     .join("");
 }
 
+// Expansión que muestra al candidato información del análisis y matching
 function renderApplicationMatchDetails(app) {
   const exact = app.match_details?.exact_match || {};
   const semantic = app.match_details?.semantic_match || {};
@@ -366,6 +369,7 @@ function openJobModal(applicationId) {
 // Funciones del Perfil / CV y Barra de Progreso (cv_profile.html)
 // -------------------------------------------------------------
 
+// Una barra de prograso que avanza según que campos obligatorios del CV tienen datos
 function updateProgressBar() {
   const fieldIds = [
     "fullName",
@@ -416,6 +420,7 @@ function setupProgressBarListeners() {
   }
 }
 
+// Carga los datos del CV que ya existe en la base de datos, relacionados al usuario autenticado
 async function loadProfileData() {
   const token = localStorage.getItem("access_token");
   if (!token) return;
@@ -475,14 +480,15 @@ async function loadProfileData() {
 
     updateProgressBar();
   } catch (error) {
-    console.error("Error al cargar la información del CV:", error);
+    console.error("Error al cargar la información del CV.");
   }
 }
 
+// Escuchador de los botones
 function setupProfileFormListeners() {
   const extractCvForm = document.getElementById("extractCvForm");
   const profileForm = document.getElementById("profileForm");
-
+  //Si se presiona el botón de Extracción de información del PDF...
   if (extractCvForm) {
     extractCvForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -520,6 +526,8 @@ function setupProfileFormListeners() {
 
         const extracted = await response.json();
         const parsed = extracted.parsed_data || {};
+
+        // Al terminar la extracción del CV del PDF con el motor de análisis NLP, ve si la IA está disponible para hacer el enriquecimiento
         const aiNotice = document.getElementById("cvAiNotice");
         if (aiNotice) {
           const aiAvailable = extracted.ai_enrichment_status === "success";
@@ -588,8 +596,8 @@ function setupProfileFormListeners() {
 
         updateProgressBar();
       } catch (err) {
-        console.error("Error al extraer PDF:", err);
-        alert(`Ocurrió un error al analizar el PDF: ${err.message}`);
+        console.error("Error al extraer PDF.");
+        alert(`Ocurrió un error al analizar el PDF.`);
       } finally {
         if (progress) progress.classList.add("d-none");
         if (btn) btn.disabled = false;
@@ -597,6 +605,8 @@ function setupProfileFormListeners() {
     });
   }
 
+  // Si se presiona el botón para Guardar cambios... se intenta guardar la información nueva del CV relacionado al usuario registrado
+  // Desencadena el guardado de habilidades nuevas en la tabla de skills
   if (profileForm) {
     profileForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -669,13 +679,12 @@ function setupProfileFormListeners() {
 
         if (!response.ok) {
           const errData = await response.json();
-          throw new Error(errData.detail || "Error guardando en la BD");
+          throw new Error("Error guardando en la base de datos");
         }
 
         alert("¡Perfil guardado correctamente!");
         updateProgressBar();
       } catch (error) {
-        console.error("Error al guardar:", error);
         alert(`Error al guardar: ${error.message}`);
       }
     });

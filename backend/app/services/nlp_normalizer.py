@@ -2,17 +2,18 @@ import re
 import unicodedata
 from typing import List, Optional
 
+## Función para quitar espacios innecesarios entre letras (por los títulos PDF que espacian las letras)
 def collapse_spaced_letters(text: str) -> str:
     if not text:
         return ""
     return re.sub(r"(?<=\b[A-ZÁÉÍÓÚÑ])\s+(?=[A-ZÁÉÍÓÚÑ]\b)", "", text)
 
-
+## Elimina acentos y convierte a minúsculas los encabezados que se le pasen
 def _normalize_heading(text: str) -> str:
     unaccented = unicodedata.normalize("NFKD", text)
     return "".join(char for char in unaccented if not unicodedata.combining(char)).casefold()
 
-
+## Lista de etiquetas que podrían tener relación con habilidades técnicas y blandas
 _SKILL_SECTION_LABELS = {
     "habilidades tecnicas": "technical",
     "competencias tecnicas": "technical",
@@ -30,6 +31,7 @@ _SKILL_SECTION_LABELS = {
     "tecnologias": "general",
 }
 
+## Lista de etiquetas de secciones que podrían ofrecer información sobre experiencia (laboral, proyectos, certificados, información personal).
 _OTHER_SECTION_LABELS = {
     "experiencia",
     "experiencia laboral",
@@ -52,6 +54,7 @@ _OTHER_SECTION_LABELS = {
     "referencias",
 }
 
+## Expresiones regulares para encontrar secciones, habilidades, separaciones entre habilidades
 _SECTION_PREFIX = re.compile(r"^\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(.*?)\s*(?:\*\*)?\s*$")
 _INLINE_SKILL_CATEGORY = re.compile(
     r"^\s*(?:habilidades?\s+)?(tecnicas?|blandas?|technical\s+skills|hard\s+skills|soft\s+skills)\s*:\s*(.*)$",
@@ -59,7 +62,7 @@ _INLINE_SKILL_CATEGORY = re.compile(
 )
 _SKILL_SEPARATORS = re.compile(r"\s*(?:,|;|\||•|·|\u2022)\s*")
 
-
+## Función para definir que de el texto es un encabezado de sección
 def _section_header(line: str) -> tuple[Optional[str], str]:
     clean_line = re.sub(r"^\s*#{1,6}\s*", "", line.strip())
     clean_line = clean_line.strip().strip("*").strip()
@@ -88,7 +91,7 @@ def _section_header(line: str) -> tuple[Optional[str], str]:
 
     return None, ""
 
-
+## Función que limpia, procesa y divide una línea de texto que contiene habilidades (skills)
 def _split_skill_line(line: str) -> list[str]:
     content = re.sub(r"^\s*(?:[-*+•]|\d+[.)])\s*", "", line).strip()
     content = content.lstrip("*").strip()
@@ -99,7 +102,7 @@ def _split_skill_line(line: str) -> list[str]:
         if 2 <= len(term.strip(" \t\r\n:.-")) <= 150
     ]
 
-
+## Función que extrae habilidades encontradas en secciones con etiquetas reconocibles y listadas relacionadas a habilidades
 def extract_resume_skills(text: str) -> tuple[List[str], List[str]]:
     """Extract original skill labels from explicitly named CV skill sections."""
     technical: list[str] = []
@@ -136,6 +139,7 @@ def extract_resume_skills(text: str) -> tuple[List[str], List[str]]:
 
     return unique_original_terms(technical), unique_original_terms(soft)
 
+## Función que extrae el título profesional. Usa expresiones regulares para tratar de encontrar el grado académico o título del candidato entre el texto plano
 def extract_professional_title(raw_text: str) -> str:
     unspaced_text = collapse_spaced_letters(raw_text)
 
@@ -155,12 +159,13 @@ def extract_professional_title(raw_text: str) -> str:
 
     parts = [p.title() for p in [academic_title, current_position] if p]
 
+    # Si logra extraer un título o grado, lo devuelve
     if parts:
         return " / ".join(parts)
-
+    # Por default devuelve...
     return "Profesional / Candidato"
 
-
+## Función que intenta normalizar y extraer experiencia laboral o proyectos
 def extract_work_experience_or_projects(exp_text: str, full_text: str) -> List[str]:
     """
     Parsea la experiencia laboral o proyectos desarrollados.
@@ -182,12 +187,13 @@ def extract_work_experience_or_projects(exp_text: str, full_text: str) -> List[s
         experience_text,
         re.IGNORECASE,
     )
+    # Si encuentra experiencia o formación o proyectos los intenta repartir en renglones con \n
     if exp_match:
         raw_lines = exp_match.group(1).split("\n")
         clean_lines = []
         for line in raw_lines:
             line_str = line.strip()
-            # Ignorar basuras o datos personales colados
+            # Intenta gnorar basuras o datos personales colados
             if len(line_str) > 10 and not re.search(
                 r"\b(?:(?:Estado civil|Fecha de nacimiento|Edad|CERTIFICADOS))\b",
                 line_str,
@@ -195,10 +201,10 @@ def extract_work_experience_or_projects(exp_text: str, full_text: str) -> List[s
             ):
                 clean_lines.append(line_str)
         return clean_lines
-
+    # Por fedault puede regresar nada
     return []
 
-
+## Función para ordenar la experiencia laboral
 def parse_work_experience_blocks(exp_text: str):
     if not exp_text:
         return []
@@ -209,7 +215,6 @@ def parse_work_experience_blocks(exp_text: str):
         exp_text.strip(),
         flags=re.IGNORECASE,
     )
-
     blocks = re.split(r"\n{2,}", cleaned_text)
     parsed_blocks = []
 
@@ -227,6 +232,7 @@ def parse_work_experience_blocks(exp_text: str):
 
     return parsed_blocks
 
+## Función para extraer la dirección/domicilio del candidato
 def extract_address_from_text(raw_text: str) -> Optional[str]:
     """
     Detecta patrones de domicilio/dirección en el texto del CV
@@ -260,7 +266,7 @@ def extract_address_from_text(raw_text: str) -> Optional[str]:
 
     return None
 
-
+## Función para tratar de detectar el titulo o estado academico del candidato
 def detect_student_or_academic_title(raw_text: str) -> str:
     """Detecta títulos académicos o estado de estudiante colapsando letras espaciadas primero."""
     if not raw_text:
@@ -282,7 +288,7 @@ def detect_student_or_academic_title(raw_text: str) -> str:
 
     return ""
 
-
+## Función para extraer información no clasificada y quitar etiquetas de anonimización
 def extract_unclassified_info(
     raw_text: str,
     full_name: str,

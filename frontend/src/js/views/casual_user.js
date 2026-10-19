@@ -68,20 +68,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Busca las vacantes disponibles para mostrarlas en index.html
   async function loadPublicJobs() {
     const container = document.getElementById("jobsContainer");
     try {
       const response = await fetch(`${API_BASE_URL}/jobs?status=active`, {
         method: "GET",
       });
-      if (!response.ok) throw new Error("Error al cargar las ofertas");
+      if (!response.ok) throw new Error("Error al cargar las ofertas.");
 
       const data = await response.json();
       allJobs = Array.isArray(data) ? data : data.items || [];
 
       renderJobs(allJobs);
     } catch (error) {
-      console.error(error);
+      console.error("Error al cargar las ofertas.");
       if (container) {
         container.innerHTML = `
           <div class="col-12">
@@ -92,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Muestra las vacantes en la pantalla yalgunos de sus datos en tarjetas con botones 
   function renderJobs(jobs) {
     const container = document.getElementById("jobsContainer");
     const countBadge = document.getElementById("jobsCount");
@@ -175,6 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Muestra un modal con la información de la vacante
   function openJobDetailModal(jobId) {
     const job = allJobs.find((j) => String(j.id) === String(jobId));
     if (!job) return;
@@ -289,10 +292,11 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("stepUploadCV")?.classList.add("d-none");
       document.getElementById("stepConfirmCV")?.classList.remove("d-none");
     } catch (error) {
-      console.error("Error al precargar la información del CV:", error);
+      console.error("Error al precargar la información del CV.");
     }
   }
 
+  // Al buscar vacantes puede buscar por texto en el titulo, descripción, area, modalidad, habilidades tecnicas. Muestra los trabajos encontrados
   function filterJobs() {
     const query = document
       .getElementById("searchInput")
@@ -422,7 +426,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       document.getElementById("stepConfirmCV")?.classList.remove("d-none");
     } catch (error) {
-      console.error(error);
+
       alert(
         "Ocurrió un error al procesar el PDF. Revisa el archivo e inténtalo nuevamente.",
       );
@@ -573,7 +577,6 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("¡Postulación enviada con éxito! La empresa revisará tu perfil.");
       }
     } catch (error) {
-      console.error("Detalle del error:", error);
       alert(`Error al postularte:\n${error.message}`);
     } finally {
       submitBtn.disabled = false;

@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (modalEl) new bootstrap.Modal(modalEl).show();
     });
 
+    // Escuchador para el botón de Crear Reclutador, disponible solo para usuario con rol Admin
     const recruiterForm = document.getElementById("createRecruiterForm");
     recruiterForm?.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -94,7 +95,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderJobs(currentJobs);
       return;
     }
-
+    // Al usar el buscador en el dashboard del reclutador, puede encontrar vacantes según coincidencias del texto en el título, descripción, area, perfil, modalidad, ubicación, habilidades
     const filteredJobs = currentJobs.filter((job) => {
       const searchableText = [
         job.title,
@@ -140,9 +141,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // 3. Cargar vacantes al iniciar
+  // Cargar vacantes al iniciar
   await loadJobs();
-
   async function loadJobs() {
     const activeContainer = document.getElementById("activeJobsList");
 
@@ -172,13 +172,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       renderJobs(currentJobs);
     } catch (error) {
-      console.error("Error en loadJobs:", error);
       if (activeContainer) {
         activeContainer.innerHTML = `
           <div class="col-12">
             <div class="alert alert-danger" role="alert">
               <i class="bi bi-exclamation-triangle-fill me-2"></i>
-              Error al cargar las vacantes. Revisa la consola del navegador.
+              Error al cargar las vacantes.
             </div>
           </div>
         `;
@@ -186,6 +185,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Cargar vacantes en secciones Activas, Vencidas, Cerradas
   function renderJobs(jobs) {
     const activeContainer = document.getElementById("activeJobsList");
     const expiredContainer = document.getElementById("expiredJobsList");
@@ -212,6 +212,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     attachJobEventListeners();
   }
 
+  // Tarjetas con un poco de información de las vacantes
   function createJobCard(job, status) {
     const skills = job.technical_skills || job.soft_skills || [];
     const statusMap = {
@@ -298,7 +299,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   `;
   }
 
-
+  // Escuchador de los botones de las tarjetas de las vacantes vistas por el reclutador
   function attachJobEventListeners() {
     // Ver Candidatos
     document.querySelectorAll(".view-candidates-btn").forEach((btn) => {
@@ -469,10 +470,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         alert("No se pudo cambiar el estado de la vacante.");
       }
     } catch (error) {
-      console.error("Error al cambiar estado de vacante:", error);
+      alert("No se pudo cambiar el estado de la vacante.");
     }
   }
 
+  // Carga los candidatos de la vacante
   async function loadCandidates(jobId) {
     const container = document.getElementById("candidatesList");
     if (!container) return;
@@ -514,7 +516,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 app.resume = await res.json();
               }
             } catch (e) {
-              console.error(`Error al cargar CV para ${app.resume_id}:`, e);
+              console.error(`Error al cargar un CV`);
             }
           }
           return app;
@@ -524,12 +526,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentCandidateApplications = appsWithResume;
       renderCandidateCards();
     } catch (error) {
-      console.error("Error al cargar candidatos:", error);
       container.innerHTML =
         '<div class="alert alert-danger">Error al cargar la lista de candidatos.</div>';
     }
   }
 
+  // Crea terjetas con información del análisis de matching
   function renderCandidateCards() {
     const container = document.getElementById("candidatesList");
     if (!container) return;
@@ -590,6 +592,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       : "No disponible";
   }
 
+  // Crea la tarjeta básica que presenta al candidato portulado y su CV
   function createCandidateCard(app) {
     const score = Math.round(app.match_score || 0);
     let badgeBg = "bg-danger";
@@ -715,7 +718,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
+  // Escuchadores
   function attachCandidateEventListeners() {
+    // para el botón de Ver CV del candidato postulado
     document.querySelectorAll(".view-cv-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const resumeId = e.currentTarget.dataset.resumeId;
@@ -724,6 +729,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
+    // para el botón de descartar candidato
     document.querySelectorAll(".reject-candidate-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
@@ -731,7 +737,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const appId = e.currentTarget.dataset.appId;
         const jobId = e.currentTarget.dataset.jobId;
 
-        const reason = prompt("ADVERTENCIA: El descarte es PERMANENTE. Ingresa el motivo del descarte (opcional):");
+        const reason = prompt(
+          "ADVERTENCIA: El descarte es PERMANENTE. Ingresa el motivo del descarte (opcional):",
+        );
 
         if (reason !== null) {
           await rejectApplication(appId, jobId, reason.trim());
@@ -740,6 +748,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Carga la información del CV del candidato
   async function loadCVDetail(resumeId) {
     const body = document.getElementById("cvDetailBody");
     if (!body) return;
@@ -783,12 +792,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         <p style="white-space: pre-line;">${parsed.more_info || "Sin información adicional."}</p>
       `;
     } catch (error) {
-      console.error("Error al cargar CV:", error);
       body.innerHTML =
         '<div class="alert alert-danger">Error al cargar el detalle del CV.</div>';
     }
   }
 
+  // Descarta al candidato
   async function rejectApplication(appId, jobId, rejectionReason = "") {
     const token = localStorage.getItem("access_token");
     if (!token) {
@@ -814,12 +823,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (response.ok) {
         await loadCandidates(jobId);
       } else {
-        const errorData = await response.json();
-        console.error("Detalle del error:", errorData);
         alert(`No se pudo descartar al candidato.`);
       }
     } catch (error) {
-      console.error("Error al descartar candidato:", error);
+
     }
   }
 });

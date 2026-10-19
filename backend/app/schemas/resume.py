@@ -1,16 +1,9 @@
 # Este código define la capa de Esquemas Pydantic para la gestión de Hojas de Vida / CVs (Resume).
-# Es la estructura de datos responsable de recibir el texto procesado por los extractores/OCR
-# y exponer la información estructurada por la IA (skills, datos parseados y referencias del archivo).
-
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
-# ==========================================
-# ESQUEMAS DE ENTRADA (SOLICITUDES / REQUESTS)
-# ==========================================
-
-
+## Esquema de entrada (Input) para procesar texto crudo extraído de un PDF
 class ResumeExtractRequest(BaseModel):
     """
     Entrada para los servicios o tareas que procesan texto crudo extraído de un PDF/Word.
@@ -21,7 +14,7 @@ class ResumeExtractRequest(BaseModel):
         ..., min_length=10, description="Texto completo extraído del documento PDF/Word"
     )
 
-
+## Esquema de entrada (Input) para crear un nuevo CV en la base de datos
 class ResumeCreate(BaseModel):
     """
     Estructura para persisitir un nuevo CV en la base de datos tras el parseo e inferencia.
@@ -44,12 +37,7 @@ class ResumeCreate(BaseModel):
         None, description="Nombre original del archivo adjuntado"
     )
 
-
-# ==========================================
-# ESQUEMAS DE RESPUESTA (RESPONSES)
-# ==========================================
-
-
+## Esquema de salida (Output) para representar un CV
 class ResumeOut(BaseModel):
     """
     Respuesta pública enviada al cliente o reclutador con el detalle estructurado del CV.

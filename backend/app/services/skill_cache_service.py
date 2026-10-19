@@ -3,24 +3,26 @@ import logging
 from typing import Dict, Iterable, List, Optional
 
 import httpx
+
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.skill_cache import SkillCache
+
 from app.services.skill_cosine_match import find_cosine_skill, generate_embedding
 from app.services.skill_exact_match import find_exact_skill
 
 ESCO_API_SEARCH_URL = "https://ec.europa.eu/esco/api/search"
 logger = logging.getLogger(__name__)
 
-
+## Función para eliminar espacios vacios al inicio o final del texto que se le pase
 def normalize_skill_term(raw_term: Optional[str]) -> str:
     if raw_term is None:
         return ""
     return str(raw_term).strip()
 
-
+##Función para buscar si el término obtenido es una habilidad, encontrarla y guardar el término de ESCO y su URL
 def query_esco_api(term: str) -> Optional[Dict[str, str]]:
     """Consulta la API de ESCO buscando coincidencia exacta o por inclusión."""
     clean_term = normalize_skill_term(term).lower()
@@ -53,7 +55,7 @@ def query_esco_api(term: str) -> Optional[Dict[str, str]]:
 
     return None
 
-
+##Función asíncrona para buscar controladamente si el término obtenido es una habilidad, encontrarla y guardar el término de ESCO y su URL
 async def _query_esco_api_async(
     client: httpx.AsyncClient,
     term: str,
@@ -105,11 +107,11 @@ async def _query_esco_api_async(
         logger.warning("No se pudo consultar ESCO para una habilidad: %s", exc)
         return None
 
-
+## Función que normaliza las habilidades encontradas y las busca en la tabla de skills
 async def cache_extracted_skill_terms(
     db: Session, skill_terms: Iterable[str]
 ) -> List[SkillCache]:
-    """Cache resume terms in exact, ESCO, then cosine-similarity order."""
+    """Busca las habilidades extraidas, en la base de datos"""
     unique_terms: dict[str, str] = {}
     for term in skill_terms or []:
         if isinstance(term, str):
@@ -121,12 +123,15 @@ async def cache_extracted_skill_terms(
     uncached_terms: list[str] = []
     for key, term in unique_terms.items():
         cached = find_exact_skill(db, term)
+        ## Si no la encuentra en la base, la enlista
         if cached is None:
             uncached_terms.append(term)
         else:
+            ##Si la encuentra, le crea un embeding
             _ensure_skill_embedding(db, cached, term)
             cached_by_term[key] = cached
-
+    
+    # si hay habilidades no encontradas en la base, las busca en ESCO para ver si existen
     if uncached_terms:
         semaphore = asyncio.Semaphore(5)
         async with httpx.AsyncClient(timeout=3.5) as client:
@@ -137,8 +142,10 @@ async def cache_extracted_skill_terms(
                 )
             )
     else:
+        # ESCO podría no devolver nada
         esco_results = []
-
+    
+    ##Si no encuentra la habilidad ni en la base ni en ESCO, la busca en la base por cercania de cosenos (arriba le creó el embedding)
     for term, esco_data in zip(uncached_terms, esco_results):
         cosine_match = None
         if esco_data is None:
@@ -151,6 +158,7 @@ async def cache_extracted_skill_terms(
         )
         esco_uri = (esco_data.get("esco_uri") or None) if esco_data else None
         embedding = await asyncio.to_thread(generate_embedding, normalized_term)
+        ## Crea un registro con la habilidad nueva descubierta para integrarla en la tabla de skills
         cached = _upsert_skill_record(
             db=db,
             raw_term=term,
@@ -165,7 +173,7 @@ async def cache_extracted_skill_terms(
 
     return [cached_by_term[key] for key in unique_terms if key in cached_by_term]
 
-
+## Función para subir una habilidad nueva en la base de datos
 def _upsert_skill_record(
     db: Session,
     raw_term: str,
@@ -198,7 +206,7 @@ def _upsert_skill_record(
             )
         return existing
 
-
+## Función para  buscar una habilidad (llama a funciones descritas arriba)
 def get_or_fetch_skill(db: Session, raw_term: str):
     clean_term = normalize_skill_term(raw_term)
     if not clean_term:
@@ -240,7 +248,7 @@ def get_or_fetch_skill(db: Session, raw_term: str):
         _ensure_skill_embedding(db, cached, clean_term)
     return cached
 
-
+## Función que crea el embedding de una habilidad que no lo tenía
 def _ensure_skill_embedding(
     db: Session, skill: SkillCache, fallback_term: str
 ) -> bool:
@@ -254,14 +262,14 @@ def _ensure_skill_embedding(
         raise RuntimeError(
             f"No se pudo generar el embedding de la habilidad: {fallback_term}"
         )
-
+    
     skill.embedding = embedding
     db.flush()
     return True
 
-
+## Función para asegurar que todas las skills en la base tengan un embedding
 def backfill_missing_skill_embeddings(db: Session) -> int:
-    """Generate and assign vectors for every skill-cache row missing one."""
+    """Genera embeddings a las habilidades que podrían no tener uno"""
     skills = (
         db.query(SkillCache)
         .filter(SkillCache.embedding.is_(None))
@@ -274,7 +282,7 @@ def backfill_missing_skill_embeddings(db: Session) -> int:
             updated += 1
     return updated
 
-
+## Función para garantizar que una lista de habilidades provistas se encuentre registrada y almacenada en la base de datos
 def ensure_skills_cached(db: Session, skills_list: Iterable[str]) -> List[SkillCache]:
     cached_entries: List[SkillCache] = []
     for skill in skills_list or []:
@@ -288,7 +296,7 @@ def ensure_skills_cached(db: Session, skills_list: Iterable[str]) -> List[SkillC
             cached_entries.append(cached)
     return cached_entries
 
-
+## Función para normalizar una lista de habilidades usando la base de datos y esco. Manda llamar a otras funciones que están arriba en el documento
 def normalize_skills_list(db: Session, skills_list: list[str]) -> list[str]:
     """Toma una lista de habilidades en texto plano y las normaliza usando la BD/ESCO."""
     normalized_skills: list[str] = []

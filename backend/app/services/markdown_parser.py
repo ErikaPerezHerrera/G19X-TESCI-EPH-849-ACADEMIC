@@ -1,9 +1,8 @@
-# markdown_parser.py (Sección split_markdown_by_sections)
 import fitz  # PyMuPDF
 import re
 from typing import Dict, List, Any
 
-
+## Función para convertir el PDF a texto en formato Markdown
 def convert_pdf_to_markdown(file_bytes: bytes) -> str:
     try:
         # IMPORTANTE: Usar stream y especificar filetype="pdf"
@@ -19,11 +18,10 @@ def convert_pdf_to_markdown(file_bytes: bytes) -> str:
         doc.close()
         return markdown_text
     except Exception as e:
-        print(f"Error convirtiendo PDF a Markdown: {e}")
+        print(f"Error convirtiendo PDF a Markdown.")
         return ""
 
-# markdown_parser.py (Sección split_markdown_by_sections)
-
+## Función para separar el texto markdown en secciones de acuerdo a palabras clave en el texto
 def split_markdown_by_sections(md_text: str) -> Dict[str, str]:
     sections = {
         "personal": "",
@@ -65,6 +63,7 @@ def split_markdown_by_sections(md_text: str) -> Dict[str, str]:
 
     return sections
 
+## Funciónpara quitar caracteres especiales y espacios innecesarios en el texto markdown
 def clean_markdown_formatting(text: str) -> str:
     if not text:
         return ""

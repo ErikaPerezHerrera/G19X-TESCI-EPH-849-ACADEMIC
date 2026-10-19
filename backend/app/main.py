@@ -1,4 +1,4 @@
-# Este es el punto de entrada principal (main.py) de tu aplicación FastAPI en PluriJob.
+# Este es el punto de entrada principal (main.py) de la aplicación FastAPI en PluriJob.
 # Se encarga de ensamblar las rutas, habilitar la integración CORS,
 # verificar la disponibilidad de PostgreSQL e inicializar la extensión vectorial pgvector
 # junto con las tablas del ORM.
@@ -7,10 +7,12 @@ import time
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
+
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine, get_db
 
@@ -22,6 +24,7 @@ from app.models.job import Job  # noqa: F401
 from app.models.resume import Resume  # noqa: F401
 from app.models.skill_cache import SkillCache  # noqa: F401
 from app.models.user import User  # noqa: F401
+
 from app.services.skill_cache_service import backfill_missing_skill_embeddings
 
 # Inicialización de la aplicación FastAPI
@@ -67,7 +70,6 @@ def startup_event() -> None:
     1. Espera la disponibilidad de la base de datos.
     2. Habilita la extensión pgvector ('CREATE EXTENSION IF NOT EXISTS vector').
     3. Crea las tablas de la base de datos según los modelos registrados en Base.metadata.
-    4. Completa los embeddings faltantes de skills_cache.
     """
     try:
         wait_for_database()
@@ -103,7 +105,7 @@ def startup_event() -> None:
                 raise
     except Exception as exc:
         raise RuntimeError(
-            f"No se pudo inicializar PostgreSQL/pgvector: {exc}"
+            f"Error: No se pudo inicializar la base de datos."
         ) from exc
 
 
@@ -142,5 +144,5 @@ def health_check(db: Session = Depends(get_db)):
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Error de conexión a la base de datos: {str(exc)}",
+            detail=f"Error de conexión a la base de datos.",
         ) from exc

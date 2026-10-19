@@ -18,7 +18,6 @@ from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
-
 class Application(Base):
     """
     Modelo ORM que representa la tabla 'applications'.

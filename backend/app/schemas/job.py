@@ -1,6 +1,4 @@
 # Este código define la capa de Esquemas Pydantic para la gestión de Ofertas Laborales (Job). 
-# Permite validar los datos ingresados al momento de publicar una vacante y 
-# dar formato a la respuesta que consume el cliente o el tablero del reclutador.
 
 from datetime import datetime
 from typing import List, Literal, Optional
@@ -8,11 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# ==========================================
-# ESQUEMAS DE ENTRADA (SOLICITUDES / REQUESTS)
-# ==========================================
-
-
+## Esquema de entrada (Input) para crear una nueva vacante
 class JobCreate(BaseModel):
     """
     Datos requeridos y validaciones para que un reclutador pueda crear una nueva vacante.
@@ -57,6 +51,7 @@ class JobCreate(BaseModel):
     benefits: Optional[str] = Field(None, description="Beneficios")
 
 
+## Esquema de entrada (Input) para reabrir una vacante existente
 class JobReopen(BaseModel):
     """Campos admitidos al reabrir una vacante, validados según su estado actual."""
 
@@ -73,7 +68,7 @@ class JobReopen(BaseModel):
     deadline: datetime | None = None
     benefits: str | None = None
 
-
+## Esquema de entrada (input) para crear un borrador de vacante mediante IA
 class JobDraftRequest(BaseModel):
     """Entrada para pedir un borrador de vacante mediante IA."""
 
@@ -90,12 +85,7 @@ class JobDraftRequest(BaseModel):
         description="Texto base opcional extraído de un archivo PDF o documento.",
     )
 
-
-# ==========================================
-# ESQUEMAS DE RESPUESTA (RESPONSES)
-# ==========================================
-
-
+## Esquema de salida (Output) para representar una vacante
 class JobOut(BaseModel):
     """
     Estructura pública de la oferta de trabajo devuelta por la API.

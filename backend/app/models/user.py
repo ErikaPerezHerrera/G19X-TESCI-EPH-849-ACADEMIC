@@ -1,7 +1,4 @@
 # Este código define el modelo ORM de SQLAlchemy para la entidad User (Usuarios).
-# Es la entidad principal sobre la que giran la autenticación,
-# la gestión de roles (recruiter, candidate, casual) y
-# la propiedad de los CVs, ofertas de empleo y postulaciones en PluriJob.
 
 import uuid
 
@@ -11,14 +8,13 @@ from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
-
 class User(Base):
     """
     Modelo ORM que representa la tabla 'users'.
     Almacena la información de autenticación, perfil y rol de cada usuario
     (candidatos registrados, usuarios casuales/anónimos y reclutadores).
     """
-
+    # Indices adicionales para optimizar las búsquedas y la gestión de usuarios
     __tablename__ = "users"
     __table_args__ = (
         Index("idx_users_role", "role"),

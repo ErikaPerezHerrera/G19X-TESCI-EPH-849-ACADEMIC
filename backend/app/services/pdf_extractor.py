@@ -1,5 +1,3 @@
-# pdf_extractor.py
-
 import re
 from typing import Tuple
 
@@ -9,7 +7,6 @@ from app.services.markdown_parser import (
     convert_pdf_to_markdown,
     clean_markdown_formatting,
 )
-
 from app.services.nlp_normalizer import (
     extract_address_from_text,
     detect_student_or_academic_title,
@@ -21,28 +18,14 @@ from app.services.nlp_normalizer import (
 )
 from app.services.skill_cache_service import cache_extracted_skill_terms
 
-
-
-def clean_extracted_name(name_raw: str) -> str:
-    """Limpia el nombre extraído eliminando letras espaciadas o títulos pegados."""
-    if not name_raw:
-        return ""
-    # Desespaciar si el nombre viene separado por letras (ej: E R I K A)
-    unspaced = collapse_spaced_letters(name_raw)
-    name_clean = re.sub(r"\b(?:[A-Z]\s+){3,}[A-Z]\b.*", "", unspaced).strip()
-
-    words = name_clean.split()
-    if len(words) > 4:
-        words = words[:4]
-    return " ".join(words).title()
-
+## Función para extraer el nombre, correo y teléfono, y anonimizarlos en el raw_text
 def extract_name_and_anonymize(raw_text: str, address: str = None) -> Tuple[str, str]:
     full_name = ""
 
     if raw_text:
         # 1. Obtener los primeros tokens antes de cualquier texto desespaciado como "E S T U D I A N T E"
         first_line = raw_text.split("\n")[0].strip()
-        
+
         # Buscar palabras con formato de Nombre Propio al inicio (2 a 4 palabras)
         name_match = re.match(
             r"^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3})",
@@ -90,7 +73,22 @@ def extract_name_and_anonymize(raw_text: str, address: str = None) -> Tuple[str,
         anonymized_text = re.sub(r"\b" + clean_addr_pattern + r"\b", "[DIRECCIÓN_OCULTA]", anonymized_text, flags=re.IGNORECASE)
 
     return full_name, anonymized_text
-    
+
+## Función para limpiar el nombre del candidato
+def clean_extracted_name(name_raw: str) -> str:
+    """Limpia el nombre extraído eliminando letras espaciadas o títulos pegados."""
+    if not name_raw:
+        return ""
+    # Desespaciar si el nombre viene separado por letras
+    unspaced = collapse_spaced_letters(name_raw)
+    name_clean = re.sub(r"\b(?:[A-Z]\s+){3,}[A-Z]\b.*", "", unspaced).strip()
+
+    words = name_clean.split()
+    if len(words) > 4:
+        words = words[:4]
+    return " ".join(words).title()
+
+## Función principal para extraer la información del PDF y devolverlo al frontend
 async def extract_data_from_pdf(
     file_contents: bytes, filename: str, db: Session | None = None
 ) -> dict:

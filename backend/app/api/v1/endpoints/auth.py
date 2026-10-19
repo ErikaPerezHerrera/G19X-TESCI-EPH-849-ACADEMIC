@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -12,14 +13,18 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+
 from app.api.dependencies import get_current_user_dep
+
 from app.models.resume import Resume
 from app.models.user import User
+
 from app.schemas.user import Token, UserCreate, UserLogin, UserOut
 
 router = APIRouter(tags=["auth"])
 
 
+## Determina el rol Admin o Registered según si ya existe un usuario con rol Admin en la base de datos.
 def _resolve_registration_role(db: Session, requested_role: str | None) -> str:
     """El primer usuario registrado pasa a ser admin; el resto se registran como candidatas/os."""
     has_admin = db.query(User.id).filter(User.role == "admin").first() is not None
@@ -29,8 +34,10 @@ def _resolve_registration_role(db: Session, requested_role: str | None) -> str:
         return "admin"
     return "admin"
 
-
+## Ruta de autenticación y registro de usuarios
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+
+## Registro de usuario nuevo (rol registered o admin según corresponda)
 def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     """
     Registra un nuevo usuario en la plataforma.
@@ -52,6 +59,7 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
         password_hash=hash_password(payload.password),
         is_active=True,
     )
+    # Se crea el usuario, y se asocia con un CV existente si corresponde y se cambia la fecha de expiración del CV a None para que no caduque.
     db.add(user)
     db.flush()
     resume = (
@@ -69,12 +77,13 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     db.refresh(user)
     return user
 
-
+## Ruta administrativa para crear cuentas con rol recruiter
 @router.post(
     "/register/recruiter",
     response_model=UserOut,
     status_code=status.HTTP_201_CREATED,
 )
+## Para poder crear la cuanta de recruiter, el usuario que hace la petición debe ser admin y estar autenticado.
 def register_recruiter(
     payload: UserCreate,
     db: Session = Depends(get_db),
@@ -100,7 +109,7 @@ def register_recruiter(
     db.refresh(user)
     return user
 
-
+## Ruta de login para usuarios registrados
 @router.post("/login", response_model=Token)
 def login_user(payload: UserLogin, db: Session = Depends(get_db)):
     """
@@ -135,7 +144,7 @@ def login_user(payload: UserLogin, db: Session = Depends(get_db)):
         subject=user.email,
         expires_delta=access_token_expires,
     )
-
+    # Se devuelve el token de acceso junto con el correo electrónico y el rol del usuario.
     return {
         "access_token": access_token,
         "token_type": "bearer",

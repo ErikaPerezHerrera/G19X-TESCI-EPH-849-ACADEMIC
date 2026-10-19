@@ -97,6 +97,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
+  // Si se cargan los botones para generar la vacante con IA y el campo de texto para escribir la instrucción
   if (generateDraftButton && aiInstruction) {
     generateDraftButton.addEventListener("click", async () => {
       const instruction = aiInstruction.value.trim();
@@ -112,6 +113,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Generando...';
       if (aiNotice) aiNotice.classList.add("d-none");
 
+      // Intenta llamar a la IA para generar el borrador
       try {
         const response = await fetch(`${API_BASE_URL}/jobs/draft`, {
           method: "POST",
@@ -130,6 +132,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           throw new Error(detail);
         }
 
+        // Si no está disponible la IA o no se devuelve un borrador
         if (!result.ai_available || !result.draft) {
           showAiNotice(
             "La IA no está disponible en este momento. Inténtalo más tarde o completa el formulario manualmente.",
@@ -143,8 +146,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           "Borrador generado. Revisa la información y completa cualquier campo faltante antes de publicar.",
           "success",
         );
-      } catch (error) {
-        console.error("No se pudo generar el borrador de vacante con IA:", error);
+      } catch (error) {    
         showAiNotice(
           "La IA no está disponible en este momento. Inténtalo más tarde o completa el formulario manualmente.",
           "warning",
@@ -158,6 +160,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Si se pulsa el botón para reabrir una vacante
   if (reopenType) {
     const header = document.querySelector(".card-header .card-title");
     const notice = document.createElement("div");
@@ -171,7 +174,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       const job = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(job.detail || "No se pudo cargar la vacante.");
+        throw new Error("No se pudo cargar la vacante.");
       }
       if (job.status !== reopenType) {
         throw new Error(
@@ -234,6 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ? new Date(deadlineValue).toISOString()
       : null;
 
+    // Si la vacante a reabrir era vencida tiene que tener una fecha límite futura. Los demás datos no cambiarán.
     if (reopenType === "expired") {
       if (!deadlineValue || new Date(deadlineValue) <= new Date()) {
         alert("Selecciona una nueva fecha límite futura.");
@@ -294,7 +298,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       alert(successMessage);
       window.location.href = "jobs.html";
     } catch (error) {
-      console.error("Error al guardar la vacante:", error);
       alert(error.message || "No se pudo guardar la vacante.");
     } finally {
       if (submitButton) submitButton.disabled = false;

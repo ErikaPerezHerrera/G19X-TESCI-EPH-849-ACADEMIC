@@ -4,15 +4,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.skill_cache import SkillCache
+
 from app.services.vector_service import generate_embedding as _generate_embedding
 
 MIN_COSINE_SIMILARITY = 0.85
 
-
 def generate_embedding(raw_term: Optional[str]) -> Optional[list[float]]:
     return _generate_embedding(raw_term)
 
-
+## Realiza una búsqueda por similitud de cosenos. Si es necesario, genera el coseno de la habilidad buscada
+## Usada para buscar habilidades en la base de datos
 def find_cosine_skill(db: Session, raw_term: Optional[str]) -> Optional[SkillCache]:
     term = (raw_term or "").strip()
     if not term:

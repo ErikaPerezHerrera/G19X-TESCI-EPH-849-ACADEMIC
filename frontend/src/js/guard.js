@@ -1,3 +1,4 @@
+// Guardia de las páginas, para que si no hay un rol asignado regrese a todos al login
 (function checkAuthGuard() {
   const token = localStorage.getItem("access_token");
   const role = localStorage.getItem("user_role");

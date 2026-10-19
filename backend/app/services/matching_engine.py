@@ -2,6 +2,7 @@ import logging
 import math
 import re
 import unicodedata
+
 from typing import Any
 
 from sqlalchemy import func
@@ -11,16 +12,19 @@ from app.models.application import Application
 from app.models.job import Job
 from app.models.resume import Resume
 from app.models.skill_cache import SkillCache
+
 from app.services.gemini_service import analyze_candidate_compatibility
 from app.services.vector_service import EMBEDDING_DIMENSION
 
 logger = logging.getLogger(__name__)
 
+## Valores dados al motor de matching para calcular la coincidencia total y la sobrecalificación
 EXACT_MATCH_WEIGHT = 0.60
 SEMANTIC_MATCH_WEIGHT = 0.40
-OVERQUALIFICATION_THRESHOLD = 0.95
+OVERQUALIFICATION_THRESHOLD = 0.90
 MIN_EXTRA_SKILLS_FOR_OVERQUALIFICATION = 5
 
+## Valores establecidos en caso de que la IA en gemini_service no esté configurada.
 OVERQUALIFICATION_UNAVAILABLE_AI = {
     "status": "unavailable",
     "opinion": None,
@@ -30,6 +34,7 @@ OVERQUALIFICATION_UNAVAILABLE_AI = {
     ),
 }
 
+## Lista de valores que se buscan para establecer los niveles del Título académico y el Perfil buscado
 _ACADEMIC_LEVELS = (
     (
         6,
@@ -76,7 +81,7 @@ _ACADEMIC_LEVELS = (
     ),
 )
 
-
+## Función recursiva para convertir los datos que se le pasen en texto plano separando los elementos por saltos de línea.
 def _plain_text(value: Any) -> str:
     if isinstance(value, str):
         return value
@@ -90,17 +95,7 @@ def _plain_text(value: Any) -> str:
         )
     return ""
 
-
-def _normalize_skill(skill: Any) -> str:
-    if not isinstance(skill, str):
-        return ""
-    decomposed = unicodedata.normalize("NFKD", skill)
-    unaccented = "".join(
-        character for character in decomposed if not unicodedata.combining(character)
-    )
-    return re.sub(r"\s+", " ", unaccented).strip().casefold()
-
-
+## Función que procesa una lista completa de habilidades, las normaliza y las organiza en un diccionario (llama a la función _normalize_skill)
 def _skills(
     values: Any, skill_aliases: dict[str, str] | None = None
 ) -> dict[str, str]:
@@ -115,7 +110,17 @@ def _skills(
             )
     return result
 
+## Función que toma una habilidad en bruto y la transforma en una cadena de texto estándar y "limpia".
+def _normalize_skill(skill: Any) -> str:
+    if not isinstance(skill, str):
+        return ""
+    decomposed = unicodedata.normalize("NFKD", skill)
+    unaccented = "".join(
+        character for character in decomposed if not unicodedata.combining(character)
+    )
+    return re.sub(r"\s+", " ", unaccented).strip().casefold()
 
+## Función que realiza la búsqueda por comparación de cosenos.
 def _cosine_similarity(left: Any, right: Any) -> float | None:
     try:
         left_values = [float(value) for value in left]
@@ -139,7 +144,7 @@ def _cosine_similarity(left: Any, right: Any) -> float | None:
     )
     return max(0.0, min(1.0, cosine))
 
-
+## Función que asigna el nivel del valor Proffesional_title. Se basa en la lista de valores _ACADEMIC_LEVELS (definida al principio del documento)
 def _academic_level(text: str, *, candidate: bool = False) -> int | None:
     normalized_text = _normalize_skill(text)
     if candidate and re.search(
@@ -156,7 +161,7 @@ def _academic_level(text: str, *, candidate: bool = False) -> int | None:
     ]
     return max(levels) if levels else None
 
-
+## Función que evalua sobrecalificación de acuerdo al nivel academico solicitado (perfil) y el nivel académico del candidato (título profesional)
 def _profile_overqualification(
     profile_type: Any, professional_title: Any
 ) -> tuple[str, str]:
@@ -182,13 +187,14 @@ def _profile_overqualification(
         f"por la vacante ({required_level}).",
     )
 
-
+## Función que intenta recuperar la información del análisis que hará la IA
 def _fetch_ai_candidate_analysis(
     job: Job,
     resume: Resume,
 ) -> tuple[dict[str, Any], str, str | None]:
     parsed_data = resume.parsed_data or {}
     try:
+        # Se intenta realizar el análisis y obtener un resultado en formato JSON
         analysis = analyze_candidate_compatibility(
             {
                 "professional_title": parsed_data.get("professional_title"),
@@ -205,16 +211,21 @@ def _fetch_ai_candidate_analysis(
             },
         )
     except Exception:
+        ## En caso de que no se pueda ejecutar el análisis de IA,
+        ## se regresan los valores establecidos para este caso. Se encuantran al inicio del documento
         logger.exception("No se pudo ejecutar el análisis cualitativo de IA del candidato.")
         return dict(OVERQUALIFICATION_UNAVAILABLE_AI), OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_flag"], OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_reason"]
 
     if not isinstance(analysis, dict):
+        ## Si se hizo el análisis pero no regresó información, ## se regresan los valores establecidos para este caso. Se encuantran al inicio del documento
         return dict(OVERQUALIFICATION_UNAVAILABLE_AI), OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_flag"], OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_reason"]
 
+    ## Si por alguna razon no se pudo hacer el análisis o conectar con Gemini, ## se regresan los valores establecidos para este caso. Se encuantran al inicio del documento
     status = str(analysis.get("status") or "unavailable").lower()
     if status != "success":
         return dict(OVERQUALIFICATION_UNAVAILABLE_AI), OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_flag"], OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_reason"]
 
+    ## Si por la IA se consiguió una respuesta NO o no se obtuvo respuesta, el valor en ai_flag será NO
     ai_flag = str(analysis.get("overqualification_flag") or "NO").upper()
     if ai_flag not in {"YES", "NO"}:
         ai_flag = "NO"
@@ -229,40 +240,46 @@ def _fetch_ai_candidate_analysis(
     ).strip() or OVERQUALIFICATION_UNAVAILABLE_AI["overqualification_reason"]
     return normalized, ai_flag, normalized["overqualification_reason"]
 
-
+## Función para calcular el match
 def calculate_match(
     job: Job,
     resume: Resume,
     skill_aliases: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Calculate explainable lexical and cosine match values for a job and CV."""
+    """ Cálculo de match lexico y similitúd de cosenos entre CV y Vacante."""
     job_skills = _skills(job.technical_skills, skill_aliases)
     parsed_data = resume.parsed_data or {}
     candidate_skills = _skills(
         parsed_data.get("technical_skills"), skill_aliases
     )
-
+    ## Calculo de coincidencia entre habilidades técnicas requeridas vs del candidato
     matched_keys = job_skills.keys() & candidate_skills.keys()
     missing_keys = job_skills.keys() - candidate_skills.keys()
     extra_keys = candidate_skills.keys() - job_skills.keys()
+    ## Match léxico= habilidades que coinciden / habilidades solicitadas
     exact_score = (
         len(matched_keys) / len(job_skills)
         if job_skills
         else 1.0
     )
 
+    ## Cálculo de similitud de cosenos entre Descripción del trabajo vs Experiencia Laboral
     semantic_score = _cosine_similarity(job.embedding, resume.embedding)
+
+    ## Se aplica una penalización de 0.30 sobre el resultado de similitud de cosenos SI el match léxico es menor a 0.30
     semantic_penalty_applied = False
     semantic_penalty_percentage = 0.0
     if semantic_score is not None and exact_score < 0.30:
         semantic_penalty_applied = True
         semantic_penalty_percentage = 0.30
         semantic_score = semantic_score * 0.70
+    ## El score general se calcula multiplicando los pesos de los scores por los scores obtenidos
     score = (
         EXACT_MATCH_WEIGHT * exact_score
         + SEMANTIC_MATCH_WEIGHT * (semantic_score or 0.0)
     )
 
+    ## Se levanta la bandera de sobrecalificación si el match léxico es mayor a 0.95 y hay más de 5 habilidades no requeridas
     technical_overqualification = (
         "YES"
         if job_skills
@@ -270,10 +287,16 @@ def calculate_match(
         and len(extra_keys) >= MIN_EXTRA_SKILLS_FOR_OVERQUALIFICATION
         else "NO"
     )
+
+    ## Se llama a _profile_overqualification para saber si el nivel del candidato es mayor que el requerido
     profile_overqualification, profile_reason = _profile_overqualification(
         job.profile_type,
         parsed_data.get("professional_title"),
     )
+
+    ## Se busca la información de análisis del candidato hecho por la IA.
+    ## Si la IA hizo un análisis y determinó que el candidato está sobrecalificado, sobreescribe las banderas de
+    ## sobrecalificación por habilidades y sobrecalificación por perfil.
     ai_analysis, ai_flag, ai_reason = _fetch_ai_candidate_analysis(job, resume)
     ai_analysis_available = ai_analysis.get("status") == "success"
     ai_overqualification_override = ai_analysis_available and ai_flag == "YES"
@@ -286,10 +309,14 @@ def calculate_match(
         profile_overqualification,
         ai_flag if ai_analysis_available else None,
     )
+
+    ## Se requiere que haya 2 o más de 3 banderas por sobrecalificación con YES para calcular este booleano
+    ## provocando que is_overqualified sea YES, desencadenando la visibilidad de ciertos datos (véase código en dashboard_recruiter.js)
     is_overqualified = (
         ai_analysis_available and ai_flag == "YES"
     ) or sum(flag == "YES" for flag in overqualification_flags) >= 2
 
+    ## Prepara los resultados del análisis para guardar en la base de datos
     return {
         "match_score": round(score * 100, 2),
         "match_details": {
@@ -369,7 +396,7 @@ def calculate_match(
         "is_overqualified": is_overqualified,
     }
 
-
+## Función que recopila las habilidades técnicas en Vacante y Cv, las normaliza, las busca en skills_cache y crea un diccionario con las habilidades encontradas para su consulta rápida
 def _load_skill_aliases(
     db: Session, job: Job, resume: Resume
 ) -> dict[str, str]:
@@ -386,7 +413,6 @@ def _load_skill_aliases(
     raw_terms = {term.strip().casefold() for term in terms}
     if not raw_terms:
         return {}
-
     records = (
         db.query(SkillCache)
         .filter(func.lower(SkillCache.raw_term).in_(raw_terms))
@@ -398,7 +424,7 @@ def _load_skill_aliases(
         if record.normalized_term
     }
 
-
+## Función principal para recalcular el matching y actualizar la postulación.
 def recalculate_application_match(
     application: Application, db: Session | None = None
 ) -> Application:
@@ -417,7 +443,7 @@ def recalculate_application_match(
     application.is_overqualified = result["is_overqualified"]
     return application
 
-
+## Función que actualiza el matching al actualizar una vacante (por cambio de fecha y estatus de EXPIRED a ACIVE)
 def recalculate_job_applications(db: Session, job_id: Any) -> int:
     applications = (
         db.query(Application)
@@ -431,7 +457,7 @@ def recalculate_job_applications(db: Session, job_id: Any) -> int:
         db.commit()
     return len(applications)
 
-
+## Función que actualiza el matching al actualizar un CV (por aplicar una vacante o el usuario registrado guarda cambios del CV).
 def recalculate_resume_applications(db: Session, resume_id: Any) -> int:
     applications = (
         db.query(Application)

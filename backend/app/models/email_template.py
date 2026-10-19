@@ -3,7 +3,6 @@ from sqlalchemy import BigInteger, Boolean, Column, DateTime, String, Text, func
 
 from app.core.database import Base
 
-
 class EmailTemplate(Base):
     """
     Modelo ORM que representa la tabla 'email_templates'.

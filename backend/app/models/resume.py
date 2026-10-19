@@ -1,11 +1,8 @@
-# Este código define el modelo ORM de SQLAlchemy para la entidad Resume (Currículums / Hojas de Vida).
-# Es el núcleo del motor de IA de PluriJob, ya que combina la extracción de texto,
-# el almacenamiento JSON estructurado y
-# el vector de 384 dimensiones (Vector(384)) para realizar búsquedas semánticas mediante pgvector.
-
+# Este código define el modelo ORM de SQLAlchemy para la entidad Resume (Currículums / Hojas de Vida/ CV).
 import uuid
 
 from pgvector.sqlalchemy import Vector
+
 from sqlalchemy import Column, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.dialects.postgresql import JSONB
@@ -21,6 +18,7 @@ class Resume(Base):
     así como su representación vectorial (embedding) para el cálculo de coincidencia semántica.
     """
 
+    # Indices adicionales para optimizar las búsquedas y la gestión de CVs
     __tablename__ = "resumes"
     __table_args__ = (
         Index(

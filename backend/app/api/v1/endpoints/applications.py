@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -11,33 +12,40 @@ from app.core.security import (
     get_current_user,
     get_optional_current_user,
 )
+
 from app.models.application import Application
 from app.models.job import Job
 from app.models.resume import Resume
 from app.models.user import User
+
 from app.schemas.application import ApplicationCreate, ApplicationOut, ApplicationReject
+
 from app.services.matching_engine import recalculate_application_match
 from app.services.skill_cache_service import ensure_skills_cached
 
 router = APIRouter(prefix="", tags=["applications"])
 
+## Ruta para crear una postulación a una vacante
 @router.post(
     "/jobs/{job_id}/applications",
     response_model=ApplicationOut,
     status_code=status.HTTP_201_CREATED,
 )
+
+## Crear postulación a una vacante
 def create_application(
     job_id: UUID,
     payload: ApplicationCreate,
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
+    ## revisa si el rol del usuario actual es "registered" o "casual", si no lo es, lanza un error 403
     if current_user is not None and current_user.role not in ("registered", "casual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo los candidatos pueden postularse.",
         )
-
+    # Busca si la vacante existe y si está activa y dentro del plazo de postulación
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
@@ -56,17 +64,19 @@ def create_application(
                 detail="El plazo para postularse a esta vacante ha vencido.",
             )
 
+    # Busca el CV asociado al ID proporcionado en la solicitud
     resume = db.query(Resume).filter(Resume.id == payload.resume_id).first()
     if not resume:
         raise HTTPException(status_code=404, detail="CV no encontrado")
 
+    # Verifica que el correo electrónico proporcionado en la solicitud coincida con el correo electrónico del CV
     candidate_email = str(payload.candidate_email).lower()
     if candidate_email != resume.candidate_email.lower():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El correo de la postulación debe coincidir con el correo del CV.",
         )
-
+    # Verifica que el usuario actual (si existe) sea el propietario del CV, o que el CV no tenga un propietario si el usuario no está autenticado
     if current_user is None:
         if resume.user_id is not None:
             raise HTTPException(
@@ -78,7 +88,7 @@ def create_application(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="El CV no pertenece al usuario autenticado.",
         )
-
+    # Verifica si ya existe una postulación para la misma vacante y correo electrónico
     existing_application = (
         db.query(Application)
         .filter(
@@ -93,6 +103,7 @@ def create_application(
             detail="Ya existe una postulación para esta vacante y este correo.",
         )
 
+    # Extrae las habilidades técnicas y blandas del CV y asegura que estén en la caché de habilidades, si no, las agrega. Luego crea la postulación y calcula el puntaje de coincidencia.
     parsed_data = resume.parsed_data or {}
     raw_tech = parsed_data.get("technical_skills", [])
     raw_soft = parsed_data.get("soft_skills", [])
@@ -130,7 +141,7 @@ def create_application(
 
     return application
 
-
+## Ruta para listar postulaciones del usuario autenticado
 @router.get("/applications/me", response_model=list[ApplicationOut])
 def list_my_applications(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
@@ -142,6 +153,7 @@ def list_my_applications(
         .all()
     )
 
+## Ruta específica en la que el usuario autenticado es reclutador, para listar postulaciones de una vacante
 @router.get("/jobs/{job_id}/applications", response_model=list[ApplicationOut])
 def list_job_applications(
     job_id: UUID,
@@ -156,7 +168,7 @@ def list_job_applications(
         .all()
     )
 
-# 4. Descartar postulación
+## Ruta específica en la que el usuario autenticado es reclutador, para descartar una postulación
 @router.patch("/applications/{application_id}/reject", response_model=ApplicationOut)
 def reject_application(
     application_id: UUID,
