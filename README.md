@@ -83,7 +83,7 @@ plurijob/
 │   │   │   └── dependencies.py          # Inyección de dependencias (Auth JWT, DB Session).
 │   │   │
 │   │   ├── core/                  # Configuraciones Globales
-│   │   │   ├── config.py            # Lectura de variables de entorno (.env), configuración de CORS, integración de API KEY de Gemini.
+│   │   │   ├── config.py            # Lectura de variables de entorno (.env), configuración de CORS.
 │   │   │   ├── database.py          # Conexión a PostgreSQL (SQLAlchemy, SQLAlchemy.orm)
 │   │   │   └── security.py          # Hashing de contraseñas, creación/validación de tokens JWT, guardias de acceso según rol.
 │   │   │
@@ -159,24 +159,25 @@ plurijob/
    git clone https://github.com/ErikaPerezHerrera/G19X-TESCI-EPH-849-ACADEMIC.git
    cd G19X-TESCI-EPH-849-ACADEMIC
   ```
-2. Renombra los archivos `docker-compose.yml.example`, `backend/.env.example` y `backend/app/core/config.py.example`o créalos desde cero (quítales el .example en el nombre). 
+2. Renombra los archivos `docker-compose.yml.example` y `backend/.env.example` o créalos desde cero (quítales el .example en el nombre). 
 
 3. Copia y pega en `.env` y `docker-compose.yml` los Datos de Acceso que se encuentran en Mis Documentos > Accesos de Prueba. Y en `.env` cambia el valor de SECRET_KEY.
 
-4. Abre Docker Desktop para que el servicio de Docker empieze a escuchar.
+4. Abre Docker Desktop para que el servicio de Docker empieze a escuchar. Podrás continuar con la instalación hasta que en la barra de tareas, en el apartado de Iconos Ocultos, aparezca el icono de Docker con la leyenda "Docker Desktop Running".
 
 5. Abre una terminal (PowerShell en Windows, Terminal en macOS/Linux), navega hasta la carpeta del proyecto y ejecuta:
   ```
 docker-compose up --build -d
   ```
 A continuación se leerá el archivo **Dockerfile** y comenzarán a descargarse los requerimientos extra descritos en **requirements.txt**. De igual forma, se buscará la base de datos Plurjob y si esta no existe, se creará de forma automática con el archivo `init_db.sql`. (No incluye la ejecución de `backup.sql`, la base de datos se inicia casí vacia con excepción de las tablas email_templates y skills_cache).
+Espera hasta que en la terminal aparezca el mensaje `plurijob-api INFO: Application startup complete`.
 
-6. Abre una terminal y navega hasta la carpeta frontend del proyecto. Ejecuta el siguiente comando:
+6. Abre una terminal y navega hasta la carpeta principal del proyecto. Ejecuta el siguiente comando:
   ```
 python -m http.server 5500 --bind 127.0.0.1
   ```
 7. Copia la siguiente dirección y pégala en tu navegador para probar el sistema de forma local: 
-`http://127.0.0.1:5500/frontend/src/pages/index.html`
+`http://127.0.0.1:5500/frontend/src/pages/`
 
 ## Respaldo de la base de datos
 Este proyecto tiene en la carpeta `backend/app/db/`:
@@ -188,10 +189,7 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal:
   ```
 docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backend/app/db/backup.sql
   ```
-**nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml`, `backend.env` y `backend/app/core/config.py`.
-
-**GEMINI_API_KEY** debe coincidir en `backend/.env` y `backend/app/core/config.py`. 
-
+**nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml` y `backend.env`.
 
 ### Notas importantes
 - El volumen `postgres_data` asegura que los datos persistan aunque se reinicie el contenedor.

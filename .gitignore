@@ -5,10 +5,8 @@ __pycache__
 .pytest_cache
 .vscode
 _tests_
-backend/app/core/config.py
 .env
 docker-compose.yml
 *.env
 !*.env.example
 !*docker-compose.yml.example
-!*backend/app/core/config.py.example

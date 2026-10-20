@@ -96,34 +96,6 @@ async def extract_resume_file(
             detail=f"Error al procesar el archivo PDF."
         )
 
-
-## Ruta de creación de los JSON que guardará el CV a partir de la extracción de datos del PDF y el enriquecimiento con IA
-@router.post("/extract-json")
-def extract_resume_json(payload: ResumeExtractRequest):
-    text = payload.raw_text.strip()
-    skills = [token.strip() for token in text.split() if token.strip()][:20]
-
-    # Extraer dirección desde el texto
-    address = extract_address_from_text(text) or "Sin especificar"
-
-    parsed_data = {
-        "professional_title": "Perfil extraído",
-        "address": address,
-        "location": address,
-        "summary": text[:500],
-        "more_info": "",
-    }
-    enriched = enrich_cv_extraction(text, existing_data=parsed_data)
-    if isinstance(enriched, dict):
-        parsed_data = enriched
-
-    return {
-        "raw_text": text,
-        "parsed_data": parsed_data,
-        "extracted_skills": skills,
-        "message": "Extracción mínima simulada.",
-    }
-
 # Ruta para guardar/actualizar CV
 @router.post("", response_model=ResumeOut, status_code=status.HTTP_201_CREATED)
 def create_resume(
