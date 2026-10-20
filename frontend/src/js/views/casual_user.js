@@ -17,9 +17,44 @@ document.addEventListener("DOMContentLoaded", () => {
   // Cargar ofertas al iniciar
   loadPublicJobs();
 
-  // Búsqueda en vivo
+  // -------------------------------------------------------------
+  // Configuración del Buscador en tiempo real
+  // -------------------------------------------------------------
+  const searchInput = document.getElementById("searchInput");
+
+  const filterJobs = () => {
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    if (!query) {
+      renderJobs(allJobs);
+      return;
+    }
+
+    // Búsqueda exhaustiva en todas las variantes de la vacante
+    const filtered = allJobs.filter((job) => {
+      const searchableText = [
+        job.title,
+        job.description,
+        job.area,
+        job.profile_type,
+        job.modality,
+        job.location,
+        ...(Array.isArray(job.technical_skills) ? job.technical_skills : []),
+        ...(Array.isArray(job.soft_skills) ? job.soft_skills : []),
+      ]
+        .filter((value) => typeof value === "string")
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+
+    renderJobs(filtered);
+  };
+
+  // Eventos de escucha conectados al HTML del buscador
   document.getElementById("searchBtn")?.addEventListener("click", filterJobs);
-  document.getElementById("searchInput")?.addEventListener("keyup", (e) => {
+  searchInput?.addEventListener("input", filterJobs); // Filtra en tiempo real conforme escribes
+  searchInput?.addEventListener("keyup", (e) => {
     if (e.key === "Enter") filterJobs();
   });
 
@@ -75,7 +110,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch(`${API_BASE_URL}/jobs?status=active`, {
         method: "GET",
       });
-      if (!response.ok) throw new Error("Error al cargar las ofertas.");
+      if (!response.ok)
+        throw new Error(
+          "Error al cargar las ofertas. No se pudo acceder a la base de datos.",
+        );
 
       const data = await response.json();
       allJobs = Array.isArray(data) ? data : data.items || [];
@@ -93,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Muestra las vacantes en la pantalla yalgunos de sus datos en tarjetas con botones 
+  // Muestra las vacantes en la pantalla y algunos de sus datos en tarjetas con botones
   function renderJobs(jobs) {
     const container = document.getElementById("jobsContainer");
     const countBadge = document.getElementById("jobsCount");
@@ -168,7 +206,8 @@ document.addEventListener("DOMContentLoaded", () => {
           const titleEl = document.getElementById("applyModalJobTitle");
           const subtitleEl = document.getElementById("applyModalJobSubtitle");
           if (titleEl) titleEl.innerText = job.title;
-          if (subtitleEl) subtitleEl.innerText = `${job.area || ""} • ${job.modality || ""}`;
+          if (subtitleEl)
+            subtitleEl.innerText = `${job.area || ""} • ${job.modality || ""}`;
 
           if (applyModal) applyModal.show();
           await checkAndPreloadUserResume();
@@ -191,22 +230,41 @@ document.addEventListener("DOMContentLoaded", () => {
     const softSkillsEl = document.getElementById("modalSoftSkills");
 
     if (titleEl) titleEl.textContent = job.title || "Sin título";
-    if (subtitleEl) subtitleEl.textContent = `${job.area || "General"} • ${job.modality || "Presencial"}`;
-    if (descriptionEl) descriptionEl.textContent = job.description || "Sin descripción disponible.";
-    if (benefitsEl) benefitsEl.textContent = job.benefits || "Sin beneficios especificados.";
-    if (deadlineEl) deadlineEl.textContent = job.deadline ? new Date(job.deadline).toLocaleDateString("es-ES") : "Sin fecha límite";
+    if (subtitleEl)
+      subtitleEl.textContent = `${job.area || "General"} • ${job.modality || "Presencial"}`;
+    if (descriptionEl)
+      descriptionEl.textContent =
+        job.description || "Sin descripción disponible.";
+    if (benefitsEl)
+      benefitsEl.textContent = job.benefits || "Sin beneficios especificados.";
+    if (deadlineEl)
+      deadlineEl.textContent = job.deadline
+        ? new Date(job.deadline).toLocaleDateString("es-ES")
+        : "Sin fecha límite";
 
     if (techSkillsEl) {
-      const skills = Array.isArray(job.technical_skills) ? job.technical_skills : [];
+      const skills = Array.isArray(job.technical_skills)
+        ? job.technical_skills
+        : [];
       techSkillsEl.innerHTML = skills.length
-        ? skills.map((skill) => `<span class="badge bg-primary me-1 mb-1">${skill}</span>`).join("")
+        ? skills
+            .map(
+              (skill) =>
+                `<span class="badge bg-primary me-1 mb-1">${skill}</span>`,
+            )
+            .join("")
         : '<span class="text-muted">Ninguna especificada</span>';
     }
 
     if (softSkillsEl) {
       const skills = Array.isArray(job.soft_skills) ? job.soft_skills : [];
       softSkillsEl.innerHTML = skills.length
-        ? skills.map((skill) => `<span class="badge bg-secondary me-1 mb-1">${skill}</span>`).join("")
+        ? skills
+            .map(
+              (skill) =>
+                `<span class="badge bg-secondary me-1 mb-1">${skill}</span>`,
+            )
+            .join("")
         : '<span class="text-muted">Ninguna especificada</span>';
     }
 
@@ -234,14 +292,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const responseData = await response.json();
       if (!responseData) return;
 
-      // Obtener el registro principal
       const data = Array.isArray(responseData) ? responseData[0] : responseData;
       if (!data) return;
 
       extractedResumeData = data;
       const parsed = data.parsed_data || {};
 
-      // Poblar directamente el formulario con la información de la DB
       document.getElementById("candidateFullName").value =
         parsed.full_name || "";
 
@@ -252,14 +308,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const addressInput = document.getElementById("candidateAddress");
       if (addressInput) {
-        addressInput.value = parsed.address || parsed.location || data.address || "";
+        addressInput.value =
+          parsed.address || parsed.location || data.address || "";
       }
 
       document.getElementById("candidatePhone").value = parsed.phone || "";
       document.getElementById("candidateTitle").value =
         parsed.professional_title || "";
 
-      // Habilidades
       const techSkills = parsed.technical_skills || data.extracted_skills || [];
       const softSkills = parsed.soft_skills || [];
 
@@ -275,48 +331,22 @@ document.addEventListener("DOMContentLoaded", () => {
         ? softSkills.join(", ")
         : softSkills;
 
-      // Información extra / no clasificada (Añadido)
       const moreInfoInput = document.getElementById("candidateMoreInfo");
       if (moreInfoInput) {
         moreInfoInput.value = parsed.more_info || data.more_info || "";
       }
 
-      // Experiencia
       let expValue = parsed.work_experience || data.work_experience || "";
       if (Array.isArray(expValue)) {
         expValue = expValue.join("\n\n");
       }
       document.getElementById("candidateExperience").value = expValue;
 
-      // Ocultar sección de subir archivo y mostrar formulario listo
       document.getElementById("stepUploadCV")?.classList.add("d-none");
       document.getElementById("stepConfirmCV")?.classList.remove("d-none");
     } catch (error) {
       console.error("Error al precargar la información del CV.");
     }
-  }
-
-  // Al buscar vacantes puede buscar por texto en el titulo, descripción, area, modalidad, habilidades tecnicas. Muestra los trabajos encontrados
-  function filterJobs() {
-    const query = document
-      .getElementById("searchInput")
-      ?.value.toLowerCase()
-      .trim();
-    if (!query) {
-      renderJobs(allJobs);
-      return;
-    }
-
-    const filtered = allJobs.filter(
-      (j) =>
-        j.title.toLowerCase().includes(query) ||
-        (j.description && j.description.toLowerCase().includes(query)) ||
-        (j.area && j.area.toLowerCase().includes(query)) ||
-        (j.technical_skills &&
-          j.technical_skills.some((s) => s.toLowerCase().includes(query))),
-    );
-
-    renderJobs(filtered);
   }
 
   // Extracción del CV (PDF)
@@ -377,17 +407,26 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("candidatePhone").value =
         extractedResumeData.phone || parsed.phone || "";
       document.getElementById("candidateTitle").value =
-        extractedResumeData.professional_title || parsed.professional_title || "";
+        extractedResumeData.professional_title ||
+        parsed.professional_title ||
+        "";
 
-      const techSkillsArr = extractedResumeData.technical_skills || parsed.technical_skills || [];
-      document.getElementById("candidateSkills").value =
-        Array.isArray(techSkillsArr) ? techSkillsArr.join(", ") : techSkillsArr;
+      const techSkillsArr =
+        extractedResumeData.technical_skills || parsed.technical_skills || [];
+      document.getElementById("candidateSkills").value = Array.isArray(
+        techSkillsArr,
+      )
+        ? techSkillsArr.join(", ")
+        : techSkillsArr;
 
-      const softSkillsArr = extractedResumeData.soft_skills || parsed.soft_skills || [];
-      document.getElementById("candidateSoftSkills").value =
-        Array.isArray(softSkillsArr) ? softSkillsArr.join(", ") : softSkillsArr;
+      const softSkillsArr =
+        extractedResumeData.soft_skills || parsed.soft_skills || [];
+      document.getElementById("candidateSoftSkills").value = Array.isArray(
+        softSkillsArr,
+      )
+        ? softSkillsArr.join(", ")
+        : softSkillsArr;
 
-      // Asignar more_info buscando en la raíz o en parsed_data (Ajuste clave)
       const moreInfoInput = document.getElementById("candidateMoreInfo");
       if (moreInfoInput) {
         moreInfoInput.value =
@@ -426,7 +465,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       document.getElementById("stepConfirmCV")?.classList.remove("d-none");
     } catch (error) {
-
       alert(
         "Ocurrió un error al procesar el PDF. Revisa el archivo e inténtalo nuevamente.",
       );
@@ -445,12 +483,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-
-    const existingResumeNotice = "Si ya tenías otro CV, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
-    if (!window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?"))
-      {     
-        return;
-      }
+    const existingResumeNotice =
+      "Si ya tenías otro CV, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
+    if (!window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")) {
+      return;
+    }
 
     const skillsInput = document.getElementById("candidateSkills").value;
     const techSkillsList = skillsInput
@@ -471,7 +508,8 @@ document.addEventListener("DOMContentLoaded", () => {
       : [];
 
     const candidateEmailInput = document.getElementById("candidateEmail");
-    const candidateEmail = candidateEmailInput?.value.trim().toLowerCase() || "";
+    const candidateEmail =
+      candidateEmailInput?.value.trim().toLowerCase() || "";
     if (!candidateEmail) {
       alert("Ingresa un correo electrónico para registrar tu postulación.");
       return;
@@ -479,9 +517,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let safeCandidateEmail = candidateEmail;
     try {
-      safeCandidateEmail = await window.PluriJobAuth.validateCandidateEmailForCurrentUser(
-        candidateEmail,
-      );
+      safeCandidateEmail =
+        await window.PluriJobAuth.validateCandidateEmailForCurrentUser(
+          candidateEmail,
+        );
       if (candidateEmailInput) candidateEmailInput.value = safeCandidateEmail;
     } catch (error) {
       alert(error.message);
@@ -502,7 +541,8 @@ document.addEventListener("DOMContentLoaded", () => {
         work_experience: document
           .getElementById("candidateExperience")
           .value.trim(),
-        more_info: document.getElementById("candidateMoreInfo")?.value.trim() || "",
+        more_info:
+          document.getElementById("candidateMoreInfo")?.value.trim() || "",
         technical_skills: techSkillsList,
         soft_skills: softSkillsList,
       },
@@ -565,15 +605,11 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(errorMessage);
       }
 
-      // Ocultar el modal de postulación actual
       if (applyModal) applyModal.hide();
 
-      // Validar si el usuario está registrado o no
       if (!token) {
-        // Usuario anónimo / casual -> Desplegar invitación a registrarse
         showRegisterInvitationModal(candidateEmail);
       } else {
-        // Usuario autenticado
         alert("¡Postulación enviada con éxito! La empresa revisará tu perfil.");
       }
     } catch (error) {
@@ -585,7 +621,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Genera y despliega el modal de invitación al registro
   function showRegisterInvitationModal(email) {
     const fullName =
       document.getElementById("candidateFullName")?.value.trim() || "";

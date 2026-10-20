@@ -291,24 +291,20 @@ window.PluriJobAuth = {
 function updateNavbarState() {
   const token = localStorage.getItem("access_token");
 
-  const navCandidateDashboard = document.getElementById(
-    "navCandidateDashboard",
-  );
+  const navCandidateDashboard = document.getElementById("navCandidateDashboard");
   const navCandidateProfile = document.getElementById("navCandidateProfile");
-  const navCandidateSettings = document.getElementById("navCandidateSettings");
   const navLoginBtn = document.getElementById("navLoginBtn");
   const navLogoutBtn = document.getElementById("navLogoutBtn");
+  const navSpanBadge = document.getElementById("navSpanBadge");
 
   if (token) {
     if (navCandidateDashboard) navCandidateDashboard.classList.remove("d-none");
     if (navCandidateProfile) navCandidateProfile.classList.remove("d-none");
-    if (navCandidateSettings) navCandidateSettings.classList.remove("d-none");
     if (navLogoutBtn) navLogoutBtn.classList.remove("d-none");
     if (navLoginBtn) navLoginBtn.classList.add("d-none");
   } else {
     if (navCandidateDashboard) navCandidateDashboard.classList.add("d-none");
     if (navCandidateProfile) navCandidateProfile.classList.add("d-none");
-    if (navCandidateSettings) navCandidateSettings.classList.add("d-none");
     if (navLogoutBtn) navLogoutBtn.classList.add("d-none");
     if (navLoginBtn) navLoginBtn.classList.remove("d-none");
   }

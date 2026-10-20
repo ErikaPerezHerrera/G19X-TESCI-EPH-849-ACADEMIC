@@ -26,34 +26,40 @@
       </div>
     </div>
   </nav>
-
-  <!-- Contenido Principal -->
-  <div class="container my-4">
-
-    <!-- VISTA 1: LISTA DE VACANTES CON PESTAÑAS -->
-    <section id="jobsSection">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Gestión de Vacantes</h2>
-      </div>
-
-      <div class="row mb-4">
-        <div class="col-md-8 col-lg-6">
-          <label for="jobSearchInput" class="form-label">Buscar vacantes</label>
-          <div class="input-group shadow-sm">
-            <input
-              type="search"
-              id="jobSearchInput"
-              class="form-control"
-              placeholder="Buscar por cargo, tecnología, área, modalidad, etc..."
-              aria-label="Buscar vacantes por cargo, descripción, área o habilidades"
-            >
-            <button class="btn btn-primary" type="button" id="jobSearchButton">
-              <i class="bi bi-search"></i> Buscar
-            </button>
+      <!-- Hero / Banner de búsqueda -->
+    <div class="bg-primary text-white py-5 mb-4 shadow-sm">
+      <div class="container text-center">
+        <h1 class="display-5 fw-bold">Gestión de vacantes</h1>
+        <p class="lead">
+          Revisa tus vacantes y los candidatos que hacen match con ellas.
+        </p>
+        <!-- Buscador -->
+        <div class="row justify-content-center mt-4">
+          <div class="col-md-8">
+            <div class="input-group input-group-lg shadow-sm">
+              <input
+                type="text"
+                id="jobSearchInput"
+                class="form-control"
+                placeholder="Buscar por cargo, tecnología, área, modalidad, etc..."
+              />
+              <button class="btn btn-dark" type="button" id="jobSearchBtn">
+                <i class="bi bi-search"></i> Buscar
+              </button>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
+  <!-- Contenido Principal -->
+  <div class="container my-4">
+  
+    <!-- VISTA 1: LISTA DE VACANTES CON PESTAÑAS -->
+    <section id="jobsSection">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+      </div>
+      
       <!-- Pestañas: Activas / Vencidas / Cerradas -->
       <ul class="nav nav-tabs mb-4" id="jobsTabs" role="tablist">
         <li class="nav-item" role="presentation">

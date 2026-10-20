@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/auth/register/recruiter`, {
           method: "POST",
-          headers: {
+          headers: { 
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },

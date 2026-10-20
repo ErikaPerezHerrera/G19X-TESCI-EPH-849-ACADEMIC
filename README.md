@@ -186,7 +186,7 @@ Este proyecto tiene en la carpeta `backend/app/db/`:
 ### Restaurar respaldo
 Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal:
   ```
-docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backup.sql
+docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backend/app/db/backup.sql
   ```
 **nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml`, `backend.env` y `backend/app/core/config.py`.
 

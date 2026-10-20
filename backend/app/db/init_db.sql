@@ -1,3 +1,12 @@
+-- 1. Forzar codificación y desactivar restricciones/triggers de sesión
+\encoding UTF8
+SET session_replication_role = 'replica';
+
+-- (Aquí va todo tu contenido actual de backup_datos.sql: los COPY o INSERT)
+
+-- 2. Volver a activar los triggers al finalizar
+SET session_replication_role = 'origin';
+
 -- =============================================================================
 -- ESQUEMA BASE DE PluriJob
 -- PostgreSQL 16 + pgvector
