@@ -83,6 +83,6 @@ class ApplicationOut(BaseModel):
     job: JobOut | None = None
     resume: ResumeOut | None = None  # <-- AGREGADO: Permite que app.resume cargue en createCandidateCard
 
-    class Config:
+    class ConfigDict:
         # En Pydantic v2 permite mapear directamente desde el objeto ORM de SQLAlchemy
         from_attributes = True

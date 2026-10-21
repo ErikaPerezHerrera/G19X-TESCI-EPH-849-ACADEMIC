@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 
@@ -163,13 +163,12 @@ def create_resume(
     resume.parsed_data = payload.parsed_data or {}
     resume.extracted_skills = payload.extracted_skills or []
     resume.file_name = payload.file_name
-    
+
     # Si no hay usuario actual, se establece una fecha de expiración para el CV con 365 días a partir de la fecha actual (medida para candidato casual) Si hay un usuario actualmente registrado y que haya iniciado sesión, el CV no tiene fecha de expiración.
     if current_user is None:
-        resume.expires_at = datetime.utcnow() + timedelta(days=365)
+        resume.expires_at = datetime.now(timezone.utc) + timedelta(days=365)
     else:
         resume.expires_at = None
-
 
     parsed_skills = payload.parsed_data.get("technical_skills", []) if payload.parsed_data else []
     soft_skills = payload.parsed_data.get("soft_skills", []) if payload.parsed_data else []

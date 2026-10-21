@@ -52,6 +52,6 @@ class ResumeOut(BaseModel):
     extracted_skills: list[str]
     file_name: str | None = None
 
-    class Config:
+    class ConfigDict:
         # En Pydantic v2 mapea directamente los campos del objeto ORM de SQLAlchemy (db_resume)
         from_attributes = True

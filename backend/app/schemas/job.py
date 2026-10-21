@@ -106,6 +106,6 @@ class JobOut(BaseModel):
     deadline: Optional[datetime] = None
     benefits: Optional[str] = None
 
-    class Config:
+    class ConfigDict:
         # En Pydantic v2 mapea directamente las propiedades del objeto SQLAlchemy (db_job)
         from_attributes = True

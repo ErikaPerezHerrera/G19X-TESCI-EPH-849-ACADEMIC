@@ -1,50 +1,28 @@
 # Este es el punto de entrada principal (main.py) de la aplicación FastAPI en PluriJob.
 # Se encarga de ensamblar las rutas, habilitar la integración CORS,
 # verificar la disponibilidad de PostgreSQL e inicializar la extensión vectorial pgvector
-# junto con las tablas del ORM.
+# junto con las tablas del ORM mediante el ciclo de vida (lifespan).
 
 import time
-
+from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
-
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine, get_db
 
 # Se importan explícitamente todos los modelos ORM antes de invocar create_all()
 # para garantizar que SQLAlchemy los registre en los metadatos globales.
-from app.models.application import Application  # noqa: F401
+from app.models.application import Application  # noqa: F4
 from app.models.email_template import EmailTemplate  # noqa: F401
 from app.models.job import Job  # noqa: F401
 from app.models.resume import Resume  # noqa: F401
 from app.models.skill_cache import SkillCache  # noqa: F401
 from app.models.user import User  # noqa: F401
-
 from app.services.skill_cache_service import backfill_missing_skill_embeddings
-
-# Inicialización de la aplicación FastAPI
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-)
-
-# Configuración del middleware de CORS (Cross-Origin Resource Sharing) para comunicación con el Frontend
-if settings.BACKEND_CORS_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.BACKEND_CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-# Inclusión de las rutas de la versión 1 de la API (/api/v1)
-app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
 def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
@@ -63,13 +41,15 @@ def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
             time.sleep(delay_seconds)
 
 
-@app.on_event("startup")
-def startup_event() -> None:
-    """
-    Evento de inicio de la aplicación:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ciclo de vida de la aplicación FastAPI:
+
     1. Espera la disponibilidad de la base de datos.
     2. Habilita la extensión pgvector ('CREATE EXTENSION IF NOT EXISTS vector').
-    3. Crea las tablas de la base de datos según los modelos registrados en Base.metadata.
+    3. Crea las tablas de la base de datos según los modelos registrados en
+    Base.metadata.
+    4. Realiza actualizaciones de esquema y backfill de embeddings necesarios.
     """
     try:
         wait_for_database()
@@ -80,22 +60,18 @@ def startup_event() -> None:
             conn.execute(
                 text("ALTER TYPE job_status_enum ADD VALUE IF NOT EXISTS 'expired'")
             )
-            conn.execute(
-                text(
-                    """
-                    UPDATE applications
-                    SET ai_analysis = ai_analysis
-                        #- '{job_embedding}'
-                        #- '{resume_embedding}'
-                        #- '{inputs,job_embedding}'
-                        #- '{inputs,resume_embedding}'
-                    WHERE ai_analysis ? 'job_embedding'
-                       OR ai_analysis ? 'resume_embedding'
-                       OR COALESCE(ai_analysis #> '{inputs}', '{}'::jsonb) ? 'job_embedding'
-                       OR COALESCE(ai_analysis #> '{inputs}', '{}'::jsonb) ? 'resume_embedding'
-                    """
-                )
-            )
+            conn.execute(text("""
+                UPDATE applications
+                SET ai_analysis = ai_analysis
+                    #- '{job_embedding}'
+                    #- '{resume_embedding}'
+                    #- '{inputs,job_embedding}'
+                    #- '{inputs,resume_embedding}'
+                WHERE ai_analysis ? 'job_embedding'
+                   OR ai_analysis ? 'resume_embedding'
+                   OR COALESCE(ai_analysis #> '{inputs}', '{}'::jsonb) ? 'job_embedding'
+                   OR COALESCE(ai_analysis #> '{inputs}', '{}'::jsonb) ? 'resume_embedding'
+                """))
         with SessionLocal() as db:
             try:
                 backfill_missing_skill_embeddings(db)
@@ -104,9 +80,30 @@ def startup_event() -> None:
                 db.rollback()
                 raise
     except Exception as exc:
-        raise RuntimeError(
-            f"Error: No se pudo inicializar la base de datos."
-        ) from exc
+        raise RuntimeError("Error: No se pudo inicializar la base de datos.") from exc
+
+    yield  # La aplicación arranca y comienza a atender peticiones
+
+
+# Inicialización de la aplicación FastAPI
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
+)
+
+# Configuración del middleware de CORS (Cross-Origin Resource Sharing) para comunicación con el Frontend
+if settings.BACKEND_CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.BACKEND_CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+# Inclusión de las rutas de la versión 1 de la API (/api/v1)
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")
@@ -124,7 +121,8 @@ def health_check(db: Session = Depends(get_db)):
     try:
         result = db.execute(
             text(
-                "SELECT installed_version FROM pg_available_extensions WHERE name = 'vector';"
+                "SELECT installed_version FROM pg_available_extensions WHERE name ="
+                " 'vector';"
             )
         ).fetchone()
 
@@ -144,5 +142,5 @@ def health_check(db: Session = Depends(get_db)):
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Error de conexión a la base de datos.",
+            detail="Error de conexión a la base de datos.",
         ) from exc

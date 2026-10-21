@@ -116,6 +116,16 @@ plurijob/
 │   │   │   ├── skill_exact_match.py   # Búsqueda de habilidades exactas entre habilidades de la base.
 │   │   │   └── vector_service.py		 # Generación de embeddings.
 │   │   │
+│   ├── tests/                     # Algunas pruebas Unitarias y de Integración (pytest)
+│   │   ├── test_auth.py
+│   │   ├── test_job_draft.py
+│   │   ├── test_job_reopening.py
+│   │   ├── test_matching_engine.py
+│   │   ├── test_matching.py
+│   │   ├── test_record_embeddings.py
+│   │   ├── test_resume_ai_enrichment.py
+│   │   └── test_resume_skill_extraction.py
+│   │   │
 │   │   └── main.py                # Punto de entrada FastAPI (CORS, Middlewares, Handlers, PostgreSQL, pgvector).
 │   │
 │   ├── .env.example               # Plantilla de variables de entorno del backend

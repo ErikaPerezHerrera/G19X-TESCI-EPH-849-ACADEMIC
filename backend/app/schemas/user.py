@@ -46,7 +46,7 @@ class UserOut(BaseModel):
     role: Literal["casual", "registered", "recruiter", "admin"]
     is_active: bool = True
 
-    class Config:
+    class ConfigDict:
         # Pydantic v2: permite la conversión automática desde objetos ORM de SQLAlchemy (db_user)
         from_attributes = True
 
