@@ -177,7 +177,7 @@ plurijob/
 
 5. Abre una terminal (PowerShell en Windows, Terminal en macOS/Linux), navega hasta la carpeta del proyecto y ejecuta:
   ```
-docker-compose up --build -d
+  docker-compose up --build -d
   ```
 A continuación se leerá el archivo **Dockerfile** y comenzarán a descargarse los requerimientos extra descritos en **requirements.txt**. De igual forma, se buscará la base de datos Plurjob y si esta no existe, se creará de forma automática con el archivo `init_db.sql`. (No incluye la ejecución de `backup.sql`, la base de datos se inicia casí vacia con excepción de las tablas email_templates y skills_cache).
 Espera hasta que en la terminal aparezca el mensaje `plurijob-api INFO: Application startup complete`.
@@ -197,7 +197,7 @@ Este proyecto tiene en la carpeta `backend/app/db/`:
 ### Restaurar respaldo
 Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal:
   ```
-docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backend/app/db/backup.sql
+  docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backend/app/db/backup.sql
   ```
 **nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml` y `backend.env`.
 
@@ -207,7 +207,7 @@ docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backend/ap
   ```
   docker-compose down -v
   docker-compose up -d
-    ```
+  ```
 - Para las pruebas (y fueron muy pocas pruebas) he usado dos a tres API KEYs gratuitas proporcionadas por Google AI Studio. **No se incluirán en Accesos de prueba** porque ya excedieron el límite de consultas por día. Se recomienda crear y usar una API KEY con mayor capacidad de consultas por día.
 
 - Si no se ingresa una API KEY, conviene usar el respaldo de la base de datos para ver un desglose del análisis de IA hecho en una vacante (accediendo como un usuario de rol **"admin"** o **"recruiter"** de acuerdo a los Accesos de prueba).
@@ -220,6 +220,25 @@ docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backend/ap
 - Si el sistema se prueba sin restaurar la base de datos con `backup.sql`, el primer usuario que se registre desde `signup.html` tendrá el rol **"admin"**, y podrá registrar reclutadores.
 - Si una persona sin registro se postula a una vacante, su CV vence en 12 meses. Al registrarse, se elimina la fecha de vencimiento del CV.
 
+## Ejecución de Pruebas
+El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el motor de matching, autenticación, procesamiento de archivos y manejo de base de datos en el backend, entre otras funciones.
+
+- Para ejecutar todas las pruebas ejecuta desde la carpeta principal del proyecto:
+  ```
+  pytest
+  ```
+- Para ejecutar un archivo en específico, escribe la ruta completa hacia el archivo, por ejemplo:
+  ```
+  pytest backend/tests/test_archivo_de_ejemplo.py
+  ```
+Y si deseas ver el nombre exacto de cada función de prueba conforme se va ejecutando y su estatus individual, añade la bandera -v:
+  ```
+  pytest -v
+  ```
+ó
+  ```
+pytest backend/tests/test_archivo_de_ejemplo.py -v
+  ```
 ## Falta por implementar
 - Manejo de las diferentes etapas del proceso de selección: por el momento solo se ve el estatus received para el candidato, y el reclutador o admin pueden rechazar la postulación.
 - Envio de correos a los candidatos según la fase en la que se encuantra su proceso. Sin embargo, se contemplaron plantillas disponibles en la base de datos (tabla email_templates). (En el documento `MVP.md` se consideró como parte de otra etapa fuera del alcance de los avances hasta el día 16/10/2026)
