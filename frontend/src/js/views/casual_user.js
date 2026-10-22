@@ -344,6 +344,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       document.getElementById("stepUploadCV")?.classList.add("d-none");
       document.getElementById("stepConfirmCV")?.classList.remove("d-none");
+      const confirmCvFieldset = document.getElementById("confirmCvFieldset");
+      if (confirmCvFieldset) confirmCvFieldset.disabled = true;
+
     } catch (error) {
       console.error("Error al precargar la información del CV.");
     }

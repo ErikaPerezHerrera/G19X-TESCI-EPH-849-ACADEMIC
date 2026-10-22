@@ -180,7 +180,7 @@
             <!-- PASO 1: Subir PDF -->
             <div id="stepUploadCV">
               <label class="form-label fw-bold"
-                >Paso 1: Sube tu Hoja de Vida (PDF)</label
+                >Aquí puedes subir tu Hoja de Vida (formato PDF). O puedes escribir directamente en los campos del formulario.</label
               >
               <p class="small text-muted">
                 Extraeremos automáticamente tu experiencia y habilidades para
@@ -203,6 +203,7 @@
               >
                 <i class="bi bi-cpu"></i> Extraer Datos con IA
               </button>
+              <hr>
             </div>
 
             <!-- Spinner de Procesamiento de PDF -->
@@ -215,116 +216,117 @@
             <div id="cvAiNotice" class="alert d-none mx-3 mb-3" role="status" aria-live="polite"></div>
 
             <!-- PASO 2: Confirmación / Edición de Datos Extraídos -->
-            <form id="stepConfirmCV" class="d-none">
-              <label class="form-label fw-bold text-success">
-                <i class="bi bi-check-circle-fill"></i> Paso 2: Confirma o
-                corrige tu información extraída
-              </label>
+            <form id="stepConfirmCV">
+              <fieldset id="confirmCvFieldset">                
+                <label class="form-label fw-bold text-success">
+                  <i class="bi bi-check-circle-fill"></i> Revisa la información que será enviada a la postulación
+                </label>
 
-              <div class="mb-3">
-                <label for="candidateFullName" class="form-label small"
-                  >Nombre Completo</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  id="candidateFullName"
-                  required
-                />
-              </div>
-
-              <div class="row g-2 mb-3">
-                <div class="col-md-6">
-                  <label for="candidateEmail" class="form-label small"
-                    >Correo Electrónico</label
+                <div class="mb-3">
+                  <label for="candidateFullName" class="form-label small"
+                    >Nombre Completo</label
                   >
                   <input
-                    type="email"
+                    type="text"
                     class="form-control"
-                    id="candidateEmail"
+                    id="candidateFullName"
                     required
                   />
                 </div>
-                
-                <div class="col-md-6">
-                  <label for="candidatePhone" class="form-label small"
-                    >Teléfono / WhatsApp</label
-                  >
-                  <input type="text" class="form-control" id="candidatePhone" />
+
+                <div class="row g-2 mb-3">
+                  <div class="col-md-6">
+                    <label for="candidateEmail" class="form-label small"
+                      >Correo Electrónico</label
+                    >
+                    <input
+                      type="email"
+                      class="form-control"
+                      id="candidateEmail"
+                      required
+                    />
+                  </div>
+                  
+                  <div class="col-md-6">
+                    <label for="candidatePhone" class="form-label small"
+                      >Teléfono / WhatsApp</label
+                    >
+                    <input type="text" class="form-control" id="candidatePhone" />
+                  </div>
                 </div>
-              </div>
-              <div class="mb-3">
-                  <label for="candidateAddress" class="form-label small"
-                    >Dirección</label
+                <div class="mb-3">
+                    <label for="candidateAddress" class="form-label small"
+                      >Dirección</label
+                    >
+                    <input type="text" class="form-control" id="candidateAddress" />
+                  </div>
+
+                <div class="mb-3">
+                  <label for="candidateTitle" class="form-label small"
+                    >Título Profesional o Cargo actual</label
                   >
-                  <input type="text" class="form-control" id="candidateAddress" />
+                  <input type="text" class="form-control" id="candidateTitle" />
+                </div>              
+
+                <div class="mb-3">
+                  <label for="candidateSkills" class="form-label small"
+                    >Habilidades Técnicas (separadas por coma)</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="candidateSkills"
+                    placeholder="Python, SQL, FastAPI..."
+                  />
                 </div>
 
-              <div class="mb-3">
-                <label for="candidateTitle" class="form-label small"
-                  >Título Profesional o Cargo actual</label
+                <div class="mb-3">
+                  <label for="candidateSoftSkills" class="form-label small"
+                    >Habilidades Blandas (separadas por coma)</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="candidateSoftSkills"
+                    placeholder="Trabajo en equipo, Liderazgo, Adaptabilidad..."
+                  />
+                </div>
+
+                <div class="mb-3">
+                  <label for="candidateExperience" class="form-label small"
+                    >Resumen de Experiencia Laboral</label
+                  >
+                  <textarea
+                    class="form-control"
+                    id="candidateExperience"
+                    rows="4"
+                  ></textarea>
+                </div>
+
+                <div class="mb-3">
+                  <label for="candidateMoreInfo" class="form-label small"
+                    >Más información</label
+                  >
+                  <textarea
+                    class="form-control"
+                    id="candidateMoreInfo"
+                    rows="4"
+                  ></textarea>
+                </div>
+
+                <div class="alert alert-info small" role="alert">
+                  <i class="bi bi-info-circle"></i> Al confirmar, calcularemos tu
+                  porcentaje de compatibilidad (Match %) con esta vacante.
+                </div>
+
+                <button
+                  type="submit"
+                  class="btn btn-success w-100"
+                  id="submitApplicationBtn"
                 >
-                <input type="text" class="form-control" id="candidateTitle" />
-              </div>              
-
-              <div class="mb-3">
-                <label for="candidateSkills" class="form-label small"
-                  >Habilidades Técnicas (separadas por coma)</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  id="candidateSkills"
-                  placeholder="Python, SQL, FastAPI..."
-                />
-              </div>
-
-              <div class="mb-3">
-                <label for="candidateSoftSkills" class="form-label small"
-                  >Habilidades Blandas (separadas por coma)</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  id="candidateSoftSkills"
-                  placeholder="Trabajo en equipo, Liderazgo, Adaptabilidad..."
-                />
-              </div>
-
-              <div class="mb-3">
-                <label for="candidateExperience" class="form-label small"
-                  >Resumen de Experiencia Laboral</label
-                >
-                <textarea
-                  class="form-control"
-                  id="candidateExperience"
-                  rows="4"
-                ></textarea>
-              </div>
-
-              <div class="mb-3">
-                <label for="candidateMoreInfo" class="form-label small"
-                  >Más información</label
-                >
-                <textarea
-                  class="form-control"
-                  id="candidateMoreInfo"
-                  rows="4"
-                ></textarea>
-              </div>
-
-              <div class="alert alert-info small" role="alert">
-                <i class="bi bi-info-circle"></i> Al confirmar, calcularemos tu
-                porcentaje de compatibilidad (Match %) con esta vacante.
-              </div>
-
-              <button
-                type="submit"
-                class="btn btn-success w-100"
-                id="submitApplicationBtn"
-              >
-                <i class="bi bi-send-check"></i> Enviar Postulación
-              </button>
+                  <i class="bi bi-send-check"></i> Enviar Postulación
+                </button>
+              </fieldset>
             </form>
           </div>
         </div>
