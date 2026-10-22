@@ -102,7 +102,7 @@ class JobOut(BaseModel):
     description: str
     technical_skills: List[str]
     soft_skills: List[str]
-    status: Literal["draft", "active", "closed", "expired"]
+    status: Literal["draft", "active", "closed", "expired", "stored"]
     deadline: Optional[datetime] = None
     benefits: Optional[str] = None
 

@@ -126,7 +126,7 @@ def login_user(payload: UserLogin, db: Session = Depends(get_db)):
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No estás registrado.",
+            detail="Correo y/o contraseña incorrectos.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

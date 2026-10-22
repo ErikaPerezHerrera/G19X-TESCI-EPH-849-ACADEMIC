@@ -39,7 +39,7 @@ def create_application(
     payload: ApplicationCreate,
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
-):
+    ):
     ## revisa si el rol del usuario actual es "registered" o "casual", si no lo es, lanza un error 403
     if current_user is not None and current_user.role not in ("registered", "casual"):
         raise HTTPException(
@@ -164,7 +164,7 @@ def create_application(
 @router.get("/applications/me", response_model=list[ApplicationOut])
 def list_my_applications(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-):
+    ):
     return (
         db.query(Application)
         .options(joinedload(Application.job))  # <--- Carga eager de la relación job
@@ -173,13 +173,13 @@ def list_my_applications(
     )
 
 
-## NUEVA RUTA: Para que el candidato cancele (elimine) su postulación
+## Ruta para que el candidato cancele (elimine) su postulación
 @router.delete("/applications/{application_id}", status_code=status.HTTP_200_OK)
 def cancel_application(
     application_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+    ):
     # Buscar la postulación
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
@@ -209,7 +209,7 @@ def list_job_applications(
     job_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-):
+    ):
     return (
         db.query(Application)
         .options(
@@ -220,15 +220,14 @@ def list_job_applications(
         .all()
     )
 
-
-## Ruta específica en la que el usuario autenticado es reclutador, para descartar una postulación
-@router.patch("/applications/{application_id}/reject", response_model=ApplicationOut)
+## Ruta específica en la que el usuario autenticado es reclutador, para descartar y eliminar una postulación
+@router.patch("/applications/{application_id}/reject", status_code=status.HTTP_200_OK)
 def reject_application(
     application_id: UUID,
     payload: ApplicationReject,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-):
+    ):
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(
@@ -236,10 +235,26 @@ def reject_application(
             detail="Postulación no encontrada.",
         )
 
-    application.status = "rejected"
-    application.rejection_reason = payload.rejection_reason
+    # 1. Capturamos los datos clave antes de eliminar la postulación
+    candidate_email = application.candidate_email
+    rejection_reason = payload.rejection_reason
 
-    db.commit()
-    db.refresh(application)
+    # TODO: Aquí se integrará después la función para enviar el correo electrónico
+    # Ejemplo: send_rejection_email(candidate_email, rejection_reason)
 
-    return application
+    try:
+        # 2. Eliminamos físicamente la postulación de la base de datos para liberar el cupo y evitar recálculos
+        db.delete(application)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo procesar el descarte de la postulación.",
+        ) from exc
+
+    return {
+        "message": "Postulación rechazada y eliminada correctamente.",
+        "candidate_email": candidate_email,
+        "rejection_reason": rejection_reason,
+    }

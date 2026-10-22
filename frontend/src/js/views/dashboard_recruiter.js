@@ -34,19 +34,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       const errorBox = document.getElementById("recruiterCreateError");
 
       try {
-        const response = await fetch(`${API_BASE_URL}/auth/register/recruiter`, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+        const response = await fetch(
+          `${API_BASE_URL}/auth/register/recruiter`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              full_name: name,
+              email,
+              password,
+              role: "recruiter",
+            }),
           },
-          body: JSON.stringify({
-            full_name: name,
-            email,
-            password,
-            role: "recruiter",
-          }),
-        });
+        );
 
         const data = await response.json().catch(() => ({}));
 
@@ -60,7 +63,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         alert("Reclutador creado correctamente.");
         recruiterForm.reset();
-        bootstrap.Modal.getInstance(document.getElementById("createRecruiterModal"))?.hide();
+        bootstrap.Modal.getInstance(
+          document.getElementById("createRecruiterModal"),
+        )?.hide();
       } catch (error) {
         if (errorBox) {
           errorBox.textContent = error.message;
@@ -264,6 +269,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         <i class="bi bi-arrow-counterclockwise"></i> Reabrir
       </button>
     `;
+      // El botón de eliminar vacante cerrada solo se muestra si el rol es estrictamente admin
+      if (userRole === "admin") {
+        buttons += `
+        <button class="btn btn-outline-danger btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="delete">
+          <i class="bi bi-trash"></i> Eliminar
+        </button>
+      `;
+      }
     }
 
     return `
@@ -325,22 +338,28 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-    // Cerrar / Reabrir Vacante
+    // Cerrar / Reabrir / Eliminar Vacante
     document.querySelectorAll(".toggle-status-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const jobId = e.currentTarget.dataset.jobId;
         const action = e.currentTarget.dataset.action;
 
         if (action === "reopen") {
-          const job = currentJobs.find((item) => String(item.id) === String(jobId));
+          const job = currentJobs.find(
+            (item) => String(item.id) === String(jobId),
+          );
           if (!job) {
             alert("No se encontró la vacante que deseas reabrir.");
             return;
           }
 
           const mode = job.status === "expired" ? "expired" : "closed";
-          window.location.href =
-            `publish.html?mode=reopen-${mode}&id=${encodeURIComponent(job.id)}`;
+          window.location.href = `publish.html?mode=reopen-${mode}&id=${encodeURIComponent(job.id)}`;
+          return;
+        }
+
+        if (action === "delete") {
+          await deleteClosedJob(jobId);
           return;
         }
 
@@ -352,12 +371,36 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         await toggleJobStatus(jobId, action);
-        if(toggleJobStatus){
-          alert("La vacante ha sido cerrada.");
-        }else{
-          alert("Hubo un error al intentar cerrar la vacante");}
       });
     });
+  }
+
+// Función para almacenar/archivar la vacante cerrada (Exclusivo Admin)
+  async function deleteClosedJob(jobId) {
+    const confirmationMessage =
+      "¿Estás seguro de que deseas archivar esta vacante cerrada?\n\n" +
+      "La vacante se guardará como plantilla para futuros usos y se eliminarán de forma permanente todas sus postulaciones asociadas.";
+
+    if (!window.confirm(confirmationMessage)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/jobs/${jobId}/store`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || "No se pudo almacenar la vacante.");
+      }
+
+      alert("Vacante almacenada correctamente y postulaciones asociadas eliminadas.");
+      await loadJobs();
+    } catch (error) {
+      alert(`Error al procesar: ${error.message}`);
+    }
   }
 
   // Función para poblar y abrir el Modal con el detalle de la vacante
@@ -382,7 +425,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const modalJobModality = document.getElementById("modalJobModality");
     if (modalJobModality)
-      modalJobModality.textContent = job.modality || job.work_mode || "No especificado";
+      modalJobModality.textContent =
+        job.modality || job.work_mode || "No especificado";
 
     const modalJobLocation = document.getElementById("modalJobLocation");
     if (modalJobLocation)
@@ -395,7 +439,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const modalJobBenefits = document.getElementById("modalJobBenefits");
     if (modalJobBenefits)
-      modalJobBenefits.textContent = job.benefits || "Sin beneficios especificados.";
+      modalJobBenefits.textContent =
+        job.benefits || "Sin beneficios especificados.";
 
     const modalJobDeadline = document.getElementById("modalJobDeadline");
     if (modalJobDeadline) {
@@ -405,7 +450,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // --- Formatear Habilidades Técnicas ---
-    const technicalSkillsContainer = document.getElementById("modalTechnicalSkills");
+    const technicalSkillsContainer = document.getElementById(
+      "modalTechnicalSkills",
+    );
     if (technicalSkillsContainer) {
       technicalSkillsContainer.innerHTML = "";
       let technicalSkills = [];
@@ -470,6 +517,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (response.ok) {
         await loadJobs();
+        if (action === "close") {
+          alert("La vacante ha sido cerrada.");
+        }
       } else {
         alert("No se pudo cambiar el estado de la vacante.");
       }
@@ -495,7 +545,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         `${API_BASE_URL}/jobs/${jobId}/applications`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       if (!response.ok) throw new Error("Error al obtener postulaciones");
@@ -513,9 +563,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         applications.map(async (app) => {
           if (!app.resume && app.resume_id) {
             try {
-              const res = await fetch(`${API_BASE_URL}/resumes/${app.resume_id}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              const res = await fetch(
+                `${API_BASE_URL}/resumes/${app.resume_id}`,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                },
+              );
               if (res.ok) {
                 app.resume = await res.json();
               }
@@ -524,7 +577,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
           }
           return app;
-        })
+        }),
       );
 
       currentCandidateApplications = appsWithResume;
@@ -585,7 +638,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       return `<span class="text-muted">${escapeHtml(emptyLabel)}</span>`;
     }
     return values
-      .map((value) => `<span class="badge text-bg-light border me-1 mb-1">${escapeHtml(value)}</span>`)
+      .map(
+        (value) =>
+          `<span class="badge text-bg-light border me-1 mb-1">${escapeHtml(value)}</span>`,
+      )
       .join("");
   }
 
@@ -596,7 +652,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       : "No disponible";
   }
 
-  // Crea la tarjeta básica que presenta al candidato portulado y su CV
+  // Crea la tarjeta básica que presenta al candidato postulado y su CV
   function createCandidateCard(app) {
     const score = Math.round(app.match_score || 0);
     let badgeBg = "bg-danger";
@@ -618,10 +674,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       "Candidato sin nombre";
 
     const candidateEmail =
-      app.candidate_email ||
-      resume.candidate_email ||
-      parsed.email ||
-      "N/A";
+      app.candidate_email || resume.candidate_email || parsed.email || "N/A";
 
     const professionalTitle =
       parsed.professional_title ||
@@ -635,8 +688,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const overqualification = details.overqualification || {};
     const detailsId = `match-details-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
     const overqualificationId = `overqualification-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
-    const matchPros = renderSkillList(aiAnalysis.pros, "Sin puntos fuertes disponibles.");
-    const matchCons = renderSkillList(aiAnalysis.cons, "Sin riesgos disponibles.");
+    const matchPros = renderSkillList(
+      aiAnalysis.pros,
+      "Sin puntos fuertes disponibles.",
+    );
+    const matchCons = renderSkillList(
+      aiAnalysis.cons,
+      "Sin riesgos disponibles.",
+    );
     const overqualificationRow = (label, flag, reason) => `
       <div class="mb-2">
         <strong>${label}:</strong> ${flag === "YES" ? "SÍ" : "NO"}
@@ -764,21 +823,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       const response = await fetch(`${API_BASE_URL}/resumes/${resumeId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!response.ok) throw new Error("Error al consultar el CV");
 
       const resume = await response.json();
 
       const parsed = resume.parsed_data || {};
-      const techSkills = resume.extracted_skills || parsed.technical_skills || parsed.skills || [];
+      const techSkills =
+        resume.extracted_skills ||
+        parsed.technical_skills ||
+        parsed.skills ||
+        [];
       const softSkills = parsed.soft_skills || [];
 
-      const formattedTech = Array.isArray(techSkills) ? techSkills.join(", ") : techSkills;
-      const formattedSoft = Array.isArray(softSkills) ? softSkills.join(", ") : softSkills;
+      const formattedTech = Array.isArray(techSkills)
+        ? techSkills.join(", ")
+        : techSkills;
+      const formattedSoft = Array.isArray(softSkills)
+        ? softSkills.join(", ")
+        : softSkills;
 
       const nameElem = document.getElementById("cvCandidateName");
       if (nameElem) {
-        nameElem.innerText = parsed.full_name || resume.candidate_email || "Perfil de Candidato";
+        nameElem.innerText =
+          parsed.full_name || resume.candidate_email || "Perfil de Candidato";
       }
 
       body.innerHTML = `
@@ -821,7 +889,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           body: JSON.stringify({
             rejection_reason: rejectionReason || null,
           }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -829,8 +897,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         alert(`No se pudo descartar al candidato.`);
       }
-    } catch (error) {
-
-    }
+    } catch (error) {}
   }
 });

@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -123,7 +122,7 @@ def create_job(
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(f"La vacante se creó, pero no se pudo generar su embedding: "),
+            detail="La vacante se creó, pero no se pudo generar su embedding.",
         ) from exc
 
     try:
@@ -133,7 +132,7 @@ def create_job(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=(f"La vacante se creó, pero no se pudo guardar su embedding."),
+            detail="La vacante se creó, pero no se pudo guardar su embedding.",
         ) from exc
 
     return job
@@ -156,7 +155,7 @@ def close_job(
     return job
 
 
-## Ruta para reabrir una vacante cerrada o vencida (Refactorizada y unificada)
+## Ruta para reabrir una vacante cerrada o vencida
 @router.patch("/{job_id}/reopen", response_model=JobOut)
 def reopen_job(
     job_id: str,
@@ -168,14 +167,12 @@ def reopen_job(
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
 
-    # Ambas (expired y closed) comparten el mismo comportamiento de reapertura
     if job.status not in ["expired", "closed"]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Solo se pueden reabrir vacantes cerradas o vencidas.",
         )
 
-    # Validamos que si mandan un payload, solo traiga el deadline opcionalmente
     if payload.model_fields_set - {"deadline"}:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -205,4 +202,50 @@ def reopen_job(
             detail="No se pudo reabrir la vacante.",
         ) from exc
 
+    return job
+
+
+## Ruta para que un administrador cambie el estado de una vacante cerrada a 'stored'
+@router.patch("/{job_id}/store", response_model=JobOut)
+def store_closed_job(
+    job_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_recruiter),
+):
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. Se requiere rol de administrador para almacenar vacantes.",
+        )
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vacante no encontrada.",
+        )
+
+    if job.status != "closed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Solo se pueden almacenar vacantes que se encuentren en estado cerrado.",
+        )
+
+    try:
+        # 1. Eliminar postulaciones relacionadas
+        db.query(Application).filter(Application.job_id == job.id).delete()
+
+        # 2. Actualizar estado a stored
+        job.status = "stored"
+
+        db.commit()
+        db.refresh(job)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo almacenar la vacante y eliminar sus postulaciones.",
+        ) from exc
+
+    # Retornamos directamente el objeto job, ya que el response_model es JobOut
     return job

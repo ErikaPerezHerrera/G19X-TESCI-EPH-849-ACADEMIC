@@ -44,7 +44,7 @@ DROP TYPE IF EXISTS user_role_enum CASCADE;
 -- 3. ENUMS
 CREATE TYPE user_role_enum AS ENUM ('casual', 'registered', 'recruiter', 'admin');
 CREATE TYPE job_modality_enum AS ENUM ('presencial', 'remoto', 'hibrido');
-CREATE TYPE job_status_enum AS ENUM ('draft', 'active', 'expired', 'closed');
+CREATE TYPE job_status_enum AS ENUM ('draft', 'active', 'expired', 'closed', 'stored');
 CREATE TYPE application_status_enum AS ENUM (
     'received',
     'under_review',
