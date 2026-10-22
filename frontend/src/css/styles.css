@@ -1,0 +1,31 @@
+.candidate-sort-box{
+    min-width: 240px;
+}
+
+.candidate-sort-label{
+    display:inline-block;
+    background:#e9f2ff;
+    color:#0d6efd;
+    padding:4px 8px;
+    border-radius:20px;
+    font-size:.75rem;
+    font-weight:600;
+    margin-bottom:6px;
+}
+
+.candidate-sort-select{
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    background-color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    transition: all .2s ease;
+}
+
+.candidate-sort-select:hover{
+    border-color: #0d6efd;
+}
+
+.candidate-sort-select:focus{
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 .2rem rgba(13,110,253,.15);
+}

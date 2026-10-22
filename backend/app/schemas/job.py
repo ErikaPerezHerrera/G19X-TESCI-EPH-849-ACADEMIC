@@ -1,4 +1,4 @@
-# Este código define la capa de Esquemas Pydantic para la gestión de Ofertas Laborales (Job). 
+# Este código define la capa de Esquemas Pydantic para la gestión de Ofertas Laborales (Job).
 
 from datetime import datetime
 from typing import List, Literal, Optional
@@ -41,9 +41,9 @@ class JobCreate(BaseModel):
     soft_skills: List[str] = Field(
         default_factory=list, description="Lista de habilidades blandas"
     )
-    status: Literal["draft", "active", "closed", "expired"] = Field(
+    status: Optional[Literal["draft", "active", "closed", "expired", "stored"]] = Field(
         "active",
-        description="Estado inicial de la oferta: 'active', 'closed', 'expired'",
+        description="Estado inicial de la oferta",
     )
     deadline: Optional[datetime] = Field(
         None, description="Fecha y hora límite de postulación"

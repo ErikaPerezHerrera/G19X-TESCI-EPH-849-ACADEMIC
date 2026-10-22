@@ -6,6 +6,7 @@
   <title>PluriJob - Gestión de Vacantes</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="../../css/styles.css">
 </head>
 <body class="bg-light">
 
@@ -116,15 +117,18 @@
           </button>
           <h2 id="selectedJobTitle" class="mb-0">Candidatos Postulados</h2>
         </div>
-        <div>
-          <label for="candidateMatchSort" class="form-label small mb-1">Ordenar candidatos</label>
-          <select id="candidateMatchSort" class="form-select form-select-sm">
-            <option value="match">Match total</option>
-            <option value="exact">Coincidencia exacta</option>
-            <option value="semantic">Coincidencia semántica</option>
-            <option value="other">Otras habilidades (menor coincidencia exacta primero)</option>
+        <div class="candidate-sort-box">
+          <label for="candidateMatchSort" class="candidate-sort-label">
+              <i class="bi bi-funnel-fill me-1"></i>
+              Ordenar
+          </label>
+          <select id="candidateMatchSort" class="form-select candidate-sort-select">
+              <option value="match">Match total</option>
+              <option value="exact">Coincidencia exacta</option>
+              <option value="semantic">Coincidencia semántica</option>
+              <option value="other">Otras habilidades</option>
           </select>
-        </div>
+      </div>
       </div>
 
       <!-- Lista de candidatos desplegada directo en la página -->

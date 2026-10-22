@@ -15,28 +15,117 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
       <a class="navbar-brand fw-bold" href="jobs.html">PluriJob <span class="badge bg-primary fs-6">Reclutador</span></a>
-        
-          <div>
-            <a href="jobs.html" class="btn btn-dark badge fs-6">
-            <i class="bi"></i> Volver a vacantes
-          </a>
-          
-        </div>
+      <div>
+        <a href="jobs.html" class="btn btn-dark badge fs-6">
+          <i class="bi bi-arrow-left"></i> Volver a vacantes
+        </a>
+      </div>
     </div>
   </nav>
 
   <!-- Contenedor Principal -->
   <div class="container pb-5">
-    <div class="row justify-content-center">
-      <div class="col-lg-8">
+    
+    <!-- 1. MENÚ DE SELECCIÓN INICIAL (Se oculta al elegir una opción) -->
+    <div id="modeSelectionContainer" class="row justify-content-center py-5">
+      <div class="col-md-8 text-center">
+        <h2 class="fw-bold mb-3">¿Cómo deseas crear tu vacante?</h2>
+        <p class="text-muted mb-5">Selecciona una de las opciones para comenzar el proceso.</p>
+        <div class="row g-4">
+          <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 option-card cursor-pointer" data-mode="manual">
+              <div class="card-body text-center p-4 d-flex flex-column justify-content-between">
+                <div>
+                  <div class="text-primary fs-1 mb-3"><i class="bi bi-file-earmark-text"></i></div>
+                  <h5 class="fw-bold">Redactar vacante</h5>
+                  <p class="text-muted small">Llena cada campo del formulario manualmente desde cero.</p>
+                </div>
+                <button class="btn btn-outline-primary w-100 mt-3">Seleccionar</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 option-card cursor-pointer" data-mode="template">
+              <div class="card-body text-center p-4 d-flex flex-column justify-content-between">
+                <div>
+                  <div class="text-success fs-1 mb-3"><i class="bi bi-collection"></i></div>
+                  <h5 class="fw-bold">Reutilizar plantilla</h5>
+                  <p class="text-muted small">Toma los datos de una vacante anterior guardada como plantilla.</p>
+                </div>
+                <button class="btn btn-outline-success w-100 mt-3">Seleccionar</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 option-card cursor-pointer" data-mode="ai">
+              <div class="card-body text-center p-4 d-flex flex-column justify-content-between">
+                <div>
+                  <div class="text-warning fs-1 mb-3"><i class="bi bi-stars"></i></div>
+                  <h5 class="fw-bold">Generar con IA</h5>
+                  <p class="text-muted small">Escribe una instrucción y deja que Gemini redacte la vacante.</p>
+                </div>
+                <button class="btn btn-outline-warning w-100 mt-3">Seleccionar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. CONTENEDOR DE TRABAJO (Formulario / IA / Plantillas - Oculto al inicio) -->
+    <div id="workspaceContainer" class="row justify-content-center d-none">
+      
+      <!-- Barra lateral de cambio rápido (Aparece a la izquierda al seleccionar un modo) -->
+      <div id="quickSwitchSidebar" class="col-lg-3 mb-4 d-none">
+        <div class="card shadow-sm border-0 position-sticky" style="top: 2rem;">
+          <div class="card-body">
+            <h6 class="fw-bold text-muted text-uppercase small mb-3">Cambiar modo</h6>
+            <div class="d-grid gap-2">
+              <button class="btn btn-outline-primary btn-sm text-start switch-mode-btn" data-mode="manual">
+                <i class="bi bi-file-earmark-text me-2"></i> Redactar vacante
+              </button>
+              <button class="btn btn-outline-success btn-sm text-start switch-mode-btn" data-mode="template">
+                <i class="bi bi-collection me-2"></i> Reutilizar plantilla
+              </button>
+              <button class="btn btn-outline-warning btn-sm text-start switch-mode-btn" data-mode="ai">
+                <i class="bi bi-stars me-2"></i> Generar con IA
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna Principal de Contenido -->
+      <div id="mainWorkspaceCol" class="col-lg-9">
         
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-primary text-white py-3">
-            <h4 class="card-title mb-0 fs-5"><i class="bi bi-briefcase-fill me-2"></i>Crear Nueva Vacante</h4>
+        <!-- SECCIÓN DE PLANTILLAS (Visible solo si se elige "Reutilizar plantilla") -->
+        <div id="templatesSection" class="card shadow-sm border-0 mb-4 d-none">
+          <div class="card-header bg-success text-white py-3 d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0 fs-5"><i class="bi bi-collection-fill me-2"></i>Seleccionar Vacante Plantilla</h4>
+            <button type="button" class="btn btn-sm btn-light text-success fw-bold" id="backToSelectionBtn">
+              <i class="bi bi-arrow-left"></i> Cambiar modo
+            </button>
+          </div>
+          <div class="card-body p-4">
+            <p class="text-muted small mb-3">Elige una de las vacantes almacenadas previamente para reutilizar su información en un nuevo registro.</p>
+            <div id="templatesCardsList" class="row g-3">
+              <!-- Las tarjetas de plantillas se cargarán aquí dinámicamente -->
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN DEL FORMULARIO Y IA -->
+        <div id="formAndAiWorkspace" class="card shadow-sm border-0">
+          <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0 fs-5" id="formHeaderTitle"><i class="bi bi-briefcase-fill me-2"></i>Crear Nueva Vacante</h4>
+            <button type="button" class="btn btn-sm btn-light text-primary fw-bold" id="backToSelectionFormBtn">
+              <i class="bi bi-arrow-left"></i> Cambiar modo
+            </button>
           </div>
           <div class="card-body p-4">
 
-            <section class="border rounded-3 bg-light p-3 mb-4" aria-labelledby="aiJobDraftTitle">
+            <!-- Sección de IA (Controlada dinámicamente) -->
+            <section id="aiDraftSection" class="border rounded-3 bg-light p-3 mb-4 d-none" aria-labelledby="aiJobDraftTitle">
               <div class="d-flex align-items-start gap-3">
                 <div class="text-primary fs-4" aria-hidden="true">
                   <i class="bi bi-stars"></i>
@@ -65,22 +154,18 @@
               </div>
             </section>
 
+            <!-- Formulario principal -->
             <form id="publishJobForm">
-              
-              <!-- Título de la Vacante -->
               <div class="mb-3">
                 <label for="jobTitle" class="form-label fw-semibold">Título del Puesto *</label>
                 <input type="text" class="form-control" id="jobTitle" placeholder="Ej. Desarrollador Backend Python Senior" required>
               </div>
 
               <div class="row g-3 mb-3">
-                <!-- Área Profesional -->
                 <div class="col-md-6">
                   <label for="jobArea" class="form-label fw-semibold">Área o Departamento *</label>
                   <input type="text" class="form-control" id="jobArea" placeholder="Ej. Tecnología / TI" required>
                 </div>
-                
-                <!-- Tipo de Perfil -->
                 <div class="col-md-6">
                   <label for="profileType" class="form-label fw-semibold">Tipo de Perfil *</label>
                   <input type="text" class="form-control" id="profileType" placeholder="Ej. Ingeniería de Software" required>
@@ -88,7 +173,6 @@
               </div>
 
               <div class="row g-3 mb-3">
-                <!-- Modalidad -->
                 <div class="col-md-6">
                   <label for="jobModality" class="form-label fw-semibold">Modalidad *</label>
                   <select class="form-select" id="jobModality" required>
@@ -98,59 +182,71 @@
                     <option value="hibrido">Híbrido</option>
                   </select>
                 </div>
-
-                <!-- Ubicación -->
                 <div class="col-md-6">
                   <label for="jobLocation" class="form-label fw-semibold">Ubicación</label>
                   <input type="text" class="form-control" id="jobLocation" placeholder="Ej. Ciudad de México, MX (Opcional si es remoto)">
                 </div>
               </div>
 
-              <!-- Descripción -->
               <div class="mb-3">
                 <label for="jobDescription" class="form-label fw-semibold">Descripción del Puesto y Responsabilidades *</label>
                 <textarea class="form-control" id="jobDescription" rows="5" placeholder="Detalla las responsabilidades principales, misión del rol y propuesta de valor..." required></textarea>
               </div>
 
-              <!-- Beneficios -->
               <div class="mb-3">
                 <label for="jobBenefits" class="form-label fw-semibold">Beneficios</label>
                 <textarea class="form-control" id="jobBenefits" rows="3" placeholder="Detalla los beneficios ofrecidos..."></textarea>
               </div>
 
-              <!-- Habilidades Técnicas -->
               <div class="mb-3">
                 <label for="technicalSkills" class="form-label fw-semibold">Habilidades Técnicas (Separadas por coma) *</label>
                 <input type="text" class="form-control" id="technicalSkills" placeholder="Ej. Python, FastAPI, PostgreSQL, Git" required>
                 <div class="form-text">La IA usará estas habilidades para calcular el porcentaje de compatibilidad con los candidatos.</div>
               </div>
 
-              <!-- Habilidades Blandas -->
               <div class="mb-3">
                 <label for="softSkills" class="form-label fw-semibold">Habilidades Blandas (Separadas por coma) *</label>
                 <input type="text" class="form-control" id="softSkills" placeholder="Ej. Responsabilidad, Comunicación, Trabajo en equipo" required>
               </div>
 
-              <!-- Fecha Límite -->
               <div class="mb-4">
                 <label for="jobDeadline" class="form-label fw-semibold">Fecha Límite de Recepción</label>
                 <input type="datetime-local" class="form-control" id="jobDeadline">
                 <div class="form-text">Debe ser una fecha futura. Déjalo en blanco si no tiene fecha de expiración.</div>
               </div>
 
-              <!-- Botones de Acción -->
               <div class="d-flex justify-content-end gap-2">
                 <button type="reset" class="btn btn-outline-secondary">Limpiar</button>
                 <button type="submit" class="btn btn-primary px-4">
                   <i class="bi bi-send-fill me-2"></i>Publicar Vacante
                 </button>
               </div>
-
             </form>
 
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para ver el detalle completo de la plantilla antes de seleccionarla -->
+  <div class="modal fade" id="templateDetailModal" tabindex="-1" aria-labelledby="templateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="templateModalLabel">Detalle de la Plantilla</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="templateModalBody">
+          <!-- Se llena dinámicamente -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-success" id="confirmSelectTemplateModalBtn">
+            <i class="bi bi-check-circle me-1"></i> Usar esta plantilla
+          </button>
+        </div>
       </div>
     </div>
   </div>

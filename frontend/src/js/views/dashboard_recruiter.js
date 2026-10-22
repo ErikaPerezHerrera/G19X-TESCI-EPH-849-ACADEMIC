@@ -268,6 +268,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       <button class="btn btn-outline-success btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="reopen">
         <i class="bi bi-arrow-counterclockwise"></i> Reabrir
       </button>
+      <button class="btn btn-outline-primary btn-sm view-candidates-btn" data-job-id="${job.id}" data-job-title="${job.title}">
+        <i class="bi bi-people"></i> Candidatos
+      </button>
     `;
       // El botón de eliminar vacante cerrada solo se muestra si el rol es estrictamente admin
       if (userRole === "admin") {
