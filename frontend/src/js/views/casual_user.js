@@ -480,16 +480,28 @@ document.addEventListener("DOMContentLoaded", () => {
   // Envío final de la postulación
   async function handleSendApplication(e) {
     e.preventDefault();
-
+    const token = localStorage.getItem("access_token");
     if (!selectedJobId) {
       alert("Error: No se identificó la vacante.");
       return;
     }
-
-    const existingResumeNotice =
-      "Si ya tenías otro CV, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
-    if (!window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")) {
-      return;
+    if(!token){
+          const existingResumeNotice =
+            "Si ya tenías otro CV, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
+          if (
+            !window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")
+          ) {
+            return;
+          }
+    }
+    if (token) {
+      const existingResumeNotice =
+        "Esta es la información que se tomará en cuenta para tu postulación.";
+      if (
+        !window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")
+      ) {
+        return;
+      }
     }
 
     const skillsInput = document.getElementById("candidateSkills").value;
