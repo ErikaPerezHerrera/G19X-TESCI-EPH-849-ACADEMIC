@@ -187,7 +187,7 @@ Espera hasta que en la terminal aparezca el mensaje `plurijob-api INFO: Applicat
 python -m http.server 5500 --bind 127.0.0.1
   ```
 7. Copia la siguiente dirección y pégala en tu navegador para probar el sistema de forma local: 
-`http://127.0.0.1:5500/frontend/src/pages/`
+`http://127.0.0.1:5500/frontend/src/pages/index.html`
 
 ## Respaldo de la base de datos
 Este proyecto tiene en la carpeta `backend/app/db/`:
@@ -195,9 +195,14 @@ Este proyecto tiene en la carpeta `backend/app/db/`:
 - `backup.sql`: respaldo completo de la base con datos generados durante el desarrollo. No se recomienda usarlo si se va a probar el sistema desde cero.
 
 ### Restaurar respaldo
-Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal:
+Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Git Bash o WSL, desde la carpeta principal del proyecto:
   ```
   docker exec -i nombreContenedor psql -U nombreUsuario -d nombreBase < backend/app/db/backup.sql
+  ```
+Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powershell o CMD desde la carpeta principal del proyecto:
+  ```
+  docker cp .\backend\app\db\backup.sql nombreContenedor:/tmp/backup.sql
+  docker exec -it nombreContenedor psql -U nombreUsuarioBasedeDatos -d nombreBasedeDatos -f /tmp/backup.sql
   ```
 **nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml` y `backend.env`.
 

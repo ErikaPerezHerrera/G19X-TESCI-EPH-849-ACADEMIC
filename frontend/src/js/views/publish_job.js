@@ -41,7 +41,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   const submitButton = jobForm.querySelector('button[type="submit"]');
   const resetButton = jobForm.querySelector('button[type="reset"]');
-  const aiDraftSection = document.querySelector("#aiJobInstruction")?.closest("section");
+  const aiDraftSection = document
+    .querySelector("#aiJobInstruction")
+    ?.closest("section");
   const aiInstruction = document.getElementById("aiJobInstruction");
   const generateDraftButton = document.getElementById("generateJobDraftButton");
   const aiNotice = document.getElementById("jobAiNotice");
@@ -73,7 +75,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
 
-    if (Array.isArray(draft.technical_skills) && draft.technical_skills.length) {
+    if (
+      Array.isArray(draft.technical_skills) &&
+      draft.technical_skills.length
+    ) {
       fields.technicalSkills.value = draft.technical_skills.join(", ");
     }
     if (Array.isArray(draft.soft_skills) && draft.soft_skills.length) {
@@ -97,12 +102,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  // Si se cargan los botones para generar la vacante con IA y el campo de texto para escribir la instrucción
   if (generateDraftButton && aiInstruction) {
     generateDraftButton.addEventListener("click", async () => {
       const instruction = aiInstruction.value.trim();
       if (instruction.length < 3) {
-        showAiNotice("Escribe una instrucción o pega el texto de la vacante para generar el borrador.", "warning");
+        showAiNotice(
+          "Escribe una instrucción o pega el texto de la vacante para generar el borrador.",
+          "warning",
+        );
         aiInstruction.focus();
         return;
       }
@@ -113,7 +120,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Generando...';
       if (aiNotice) aiNotice.classList.add("d-none");
 
-      // Intenta llamar a la IA para generar el borrador
       try {
         const response = await fetch(`${API_BASE_URL}/jobs/draft`, {
           method: "POST",
@@ -132,7 +138,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           throw new Error(detail);
         }
 
-        // Si no está disponible la IA o no se devuelve un borrador
         if (!result.ai_available || !result.draft) {
           showAiNotice(
             "La IA no está disponible en este momento. Inténtalo más tarde o completa el formulario manualmente.",
@@ -146,7 +151,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           "Borrador generado. Revisa la información y completa cualquier campo faltante antes de publicar.",
           "success",
         );
-      } catch (error) {    
+      } catch (error) {
         showAiNotice(
           "La IA no está disponible en este momento. Inténtalo más tarde o completa el formulario manualmente.",
           "warning",
@@ -160,7 +165,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Si se pulsa el botón para reabrir una vacante
+  // Carga de datos si es modo reapertura (comparten idéntico comportamiento para closed y expired)
   if (reopenType) {
     const header = document.querySelector(".card-header .card-title");
     const notice = document.createElement("div");
@@ -199,28 +204,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         fields.deadline.value = localDeadline.toISOString().slice(0, 16);
       }
 
-      if (reopenType === "closed") {
-        if (header) header.textContent = "Editar y reabrir vacante";
-        notice.textContent =
-          "Revisa los datos de la vacante cerrada. Al guardar, se actualizará esta misma vacante y volverá a aceptar postulaciones.";
-        if (submitButton) {
-          submitButton.innerHTML =
-            '<i class="bi bi-arrow-counterclockwise me-2"></i>Guardar cambios y reabrir';
-        }
-      } else {
-        if (header) header.textContent = "Extender fecha y reabrir vacante";
-        notice.textContent =
-          "Esta vacante venció. Sus datos no se pueden editar aquí; indica una nueva fecha límite futura para reabrirla.";
-        Object.entries(fields).forEach(([name, field]) => {
-          if (name !== "deadline") field.disabled = true;
-        });
-        fields.deadline.required = true;
-        fields.deadline.min = toLocalDateTimeInputValue(new Date());
-        if (resetButton) resetButton.classList.add("d-none");
-        if (submitButton) {
-          submitButton.innerHTML =
-            '<i class="bi bi-calendar-plus me-2"></i>Guardar fecha y reabrir';
-        }
+      if (header) header.textContent = "Reabrir vacante";
+      notice.textContent =
+        "Puedes indicar una nueva fecha límite futura opcional para reabrir la vacante.";
+
+      Object.entries(fields).forEach(([name, field]) => {
+        if (name !== "deadline") field.disabled = true;
+      });
+
+      // La fecha límite ya NO es obligatoria (se quita required)
+      fields.deadline.required = false;
+      fields.deadline.min = toLocalDateTimeInputValue(new Date());
+      if (resetButton) resetButton.classList.add("d-none");
+      if (submitButton) {
+        submitButton.innerHTML =
+          '<i class="bi bi-calendar-plus me-2"></i>Guardar y reabrir';
       }
     } catch (error) {
       alert(error.message);
@@ -237,12 +235,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       ? new Date(deadlineValue).toISOString()
       : null;
 
-    // Si la vacante a reabrir era vencida tiene que tener una fecha límite futura. Los demás datos no cambiarán.
-    if (reopenType === "expired") {
-      if (!deadlineValue || new Date(deadlineValue) <= new Date()) {
-        alert("Selecciona una nueva fecha límite futura.");
-        return;
-      }
+    // Si el usuario ingresó una fecha límite, validamos obligatoriamente que sea mayor al momento actual
+    if (deadlineValue && new Date(deadlineValue) <= new Date()) {
+      alert("La nueva fecha límite debe ser posterior al momento actual.");
+      return;
     }
 
     const skills = (field) =>
@@ -251,21 +247,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         .map((skill) => skill.trim())
         .filter(Boolean);
 
-    const payload =
-      reopenType === "expired"
-        ? { deadline }
-        : {
-            title: fields.title.value.trim(),
-            area: fields.area.value.trim(),
-            profile_type: fields.profileType.value.trim(),
-            modality: fields.modality.value,
-            location: fields.location.value.trim() || null,
-            description: fields.description.value.trim(),
-            technical_skills: skills(fields.technicalSkills),
-            soft_skills: skills(fields.softSkills),
-            deadline,
-            benefits: fields.benefits.value.trim() || null,
-          };
+    const payload = reopenType
+      ? { deadline } // Al reabrir, solo mandamos la fecha (opcional)
+      : {
+          title: fields.title.value.trim(),
+          area: fields.area.value.trim(),
+          profile_type: fields.profileType.value.trim(),
+          modality: fields.modality.value,
+          location: fields.location.value.trim() || null,
+          description: fields.description.value.trim(),
+          technical_skills: skills(fields.technicalSkills),
+          soft_skills: skills(fields.softSkills),
+          deadline,
+          benefits: fields.benefits.value.trim() || null,
+        };
 
     const url = reopenType
       ? `${API_BASE_URL}/jobs/${jobId}/reopen`

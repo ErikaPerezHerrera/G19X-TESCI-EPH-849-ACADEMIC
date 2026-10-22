@@ -15,14 +15,10 @@ from app.core.security import get_current_user, get_optional_current_user, get_c
 from app.models.resume import Resume
 from app.models.user import User
 
-from app.schemas.resume import ResumeCreate, ResumeExtractRequest, ResumeOut
+from app.schemas.resume import ResumeCreate, ResumeOut
 
 from app.services.pdf_extractor import extract_data_from_pdf
-from app.services.gemini_service import (
-    enrich_cv_extraction,
-    enrich_cv_extraction_with_status,
-)
-from app.services.nlp_normalizer import extract_address_from_text
+from app.services.gemini_service import enrich_cv_extraction_with_status
 from app.services.matching_engine import recalculate_resume_applications
 from app.services.skill_cache_service import ensure_skills_cached
 from app.services.vector_service import generate_embedding
@@ -34,7 +30,7 @@ logger = logging.getLogger(__name__)
 @router.post("/extract")
 async def extract_resume_file(
     file: UploadFile = File(...), db: Session = Depends(get_db)
-):
+    ):
     filename = file.filename or ""
     if not filename.lower().endswith(".pdf"):
         raise HTTPException(
@@ -102,7 +98,7 @@ def create_resume(
     payload: ResumeCreate,
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
-):
+    ):
     if current_user is not None and current_user.role not in ("registered", "casual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -152,7 +148,7 @@ def create_resume(
                 detail="Ya existe un CV asociado al correo leído en el análisis.",
             )
 
-    # Si el CV no existe se ccrea uno nuevo, si existe se actualiza con los datos del payload
+    # Si el CV no existe se crea uno nuevo, si existe se actualiza con los datos del payload
     if resume is None:
         resume = Resume()
         db.add(resume)
@@ -236,7 +232,7 @@ def create_resume(
 @router.get("/me", response_model=list[ResumeOut])
 def list_my_resumes(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-):
+    ):
     return (
         db.query(Resume)
         .filter(Resume.user_id == current_user.id)

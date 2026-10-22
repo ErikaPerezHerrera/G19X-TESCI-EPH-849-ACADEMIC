@@ -261,7 +261,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (isClosed) {
       buttons += `
       <button class="btn btn-outline-success btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="reopen">
-        <i class="bi bi-arrow-counterclockwise"></i> Editar y reabrir
+        <i class="bi bi-arrow-counterclockwise"></i> Reabrir
       </button>
     `;
     }
@@ -346,12 +346,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (action === "close") {
           const confirmed = confirm(
-            "Al cerrar esta vacante se eliminarán permanentemente las postulaciones de los candidatos asociados. ¿Deseas continuar?",
+            "¿Estás seguro de que quieres cerrar esta vacante?",
           );
           if (!confirmed) return;
         }
 
         await toggleJobStatus(jobId, action);
+        if(toggleJobStatus){
+          alert("La vacante ha sido cerrada.");
+        }else{
+          alert("Hubo un error al intentar cerrar la vacante");}
       });
     });
   }
