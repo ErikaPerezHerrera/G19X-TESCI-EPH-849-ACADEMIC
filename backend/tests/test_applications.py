@@ -8,7 +8,7 @@ from app.main import app
 
 def get_auth_token_for_user(
     client: TestClient, email: str, role_password: str = "securepassword123"
-) -> str:
+    ) -> str:
     """Registra un usuario y retorna su token JWT de acceso."""
     client.post(
         "/api/v1/auth/register",
@@ -32,7 +32,7 @@ def create_mock_resume_and_job(
     client: TestClient,
     recruiter_token: str,
     candidate_email: str = "candidate@example.com",
-):
+ ):
     """Función de apoyo para crear un CV y una Vacante activa en la BD de pruebas."""
     from app.models.user import User
     from app.models.resume import Resume
@@ -207,11 +207,6 @@ def test_recruiter_lists_and_rejects_application():
             )
         application_id = create_app_res.json()["id"]
 
-        list_res = client.post(  # o get según tu ruta de listado
-            f"/api/v1/jobs/{job_id}/applications",
-            headers={"Authorization": f"Bearer {recruiter_token}"},
-        )
-        # Nota: ajusta si tu listado usa GET
         list_get_res = client.get(
             f"/api/v1/jobs/{job_id}/applications",
             headers={"Authorization": f"Bearer {recruiter_token}"},
@@ -227,5 +222,9 @@ def test_recruiter_lists_and_rejects_application():
             },
         )
         assert reject_res.status_code == 200, reject_res.text
-        assert reject_res.json()["status"] == "rejected"
-        assert reject_res.json()["rejection_reason"] is not None
+
+        # Validamos las llaves reales que retorna tu endpoint al rechazar/eliminar
+        data = reject_res.json()
+        assert data["candidate_email"] == candidate_email
+        assert data["rejection_reason"] is not None
+        assert "eliminada correctamente" in data["message"]

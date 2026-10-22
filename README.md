@@ -12,13 +12,15 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 ## ¿Qué hace?
 ### Administrador
 - Agregar o eliminar reclutadores.
+- Archivar vacantes.
 - Inicio de sesión.
-- Crear vacantes.
+- Crear vacantes redactando personalmente el contenido.
 - Reabrir y cerrar vacantes.
+- Crear vacantes tomando la información de otras vacantes en la base de datos.
 - Solicitar un borrador de vacante asistido por IA a partir de una descripción libre.
 - Consultar vacantes activas y cerradas.
 - Buscar y filtrar vacantes por texto, área, modalidad y estado.
-- Reactivar una vacante cerrada reutilizando sus datos.
+- Reactivar una vacante cerrada o vencida reutilizando sus datos.
 - Ver candidatos que aplicaron a una vacante.
 - Ordenar candidatos por puntuación de matching.
 - Revisar candidatos con habilidades adicionales o posible sobrecalificación.
@@ -27,12 +29,13 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 
 ### Reclutador
 - Inicio de sesión.
-- Crear vacantes.
+- Crear vacantes redactando personalmente el contenido.
+- Crear vacantes tomando la información de otras vacantes en la base de datos.
 - Solicitar un borrador de vacante asistido por IA a partir de una descripción libre.
 - Reabrir y cerrar vacantes.
 - Consultar vacantes activas y cerradas.
 - Buscar y filtrar vacantes por texto, área, modalidad.
-- Reactivar una vacante cerrada reutilizando sus datos.
+- Reactivar una vacante cerrada o vencida reutilizando sus datos.
 - Ver candidatos que aplicaron a una vacante.
 - Ordenar candidatos por puntuación de matching.
 - Revisar candidatos con habilidades adicionales o posible sobrecalificación.
@@ -43,10 +46,14 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 - Listar y filtrar vacantes por texto, modalidad y área.
 - Extraer texto del PDF.
 - Usar IA opcional sobre el texto para enriquecer la extracción de datos del CV.
-- Revisar y editar los campos extraídos/sugeridos antes de enviar; el análisis local y la corrección manual siguen disponibles aunque la IA falle.
-- Aplicar a una vacante como usuario casual (sin registrar en la plataforma).
+- Como usuario no registrado, revisar los campos extraídos/sugeridos antes de enviar la postulación.
+- Aplicar a una vacante.
+- Tener máximo 3 procesos al mismo tiempo.
 - Registrarse y conservar el CV como usuario registrado.
 - Como usuario registrado, consultar sus aplicaciones básicas mediante una lista sencilla de sus postulaciones.
+- Como usuario registrado, cancelar postulaciones.
+- Para la creación del CV, el uso de IA es opcional. El CV puede crearse directamente en el formulario provisto.
+
 
 ## Tecnologías usadas:
 - FastAPI
@@ -237,7 +244,7 @@ El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el 
 Si se quieren ejecutar debes seguir los siguientes pasos:
 1. Crea una base de datos de prueba ejecutando en la terminal (Shell) en la ubicación de la carpeta principal del proyecto:
   ```
-  docker exec -it nombreContenedor psql -U nombreUsuarioBasedeDatos -c "CREATE DATABASE plurijob_test;"
+  docker exec -it nombreContenedor psql -U nombreUsuarioBasedeDatos -c "CREATE DATABASE plurijob_test;" ; docker exec -it nombreContenedor psql -U nombreUsuarioBasedeDatos -d plurijob_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
   ```
 2. Para ejecutar todas las pruebas ejecuta desde la carpeta principal del proyecto:
   ```
@@ -255,12 +262,13 @@ Y si deseas ver el nombre exacto de cada función de prueba conforme se va ejecu
   ```
   python -m pytest backend/tests/test_archivo_de_ejemplo.py -v
   ```
+**Otras opciones** 
+- Dentro del contenedor Docker: Si no tienes un entorno de Python configurado localmente en tu máquina, puedes ejecutar las pruebas directamente dentro del contenedor en ejecución:
+```
+docker exec -it nombreContenedor python -m pytest
+```
+- Localmente: Para ejecutar python -m pytest desde tu máquina local, asegúrate de haber instalado previamente las dependencias ejecutando `pip install -r backend/requirements.txt` en tu propio entorno virtual.
+
 ## Falta por implementar
 - Manejo de las diferentes etapas del proceso de selección: por el momento solo se ve el estatus received para el candidato, y el reclutador o admin pueden rechazar la postulación.
 - Envio de correos a los candidatos según la fase en la que se encuantra su proceso. Sin embargo, se contemplaron plantillas disponibles en la base de datos (tabla email_templates). (En el documento `MVP.md` se consideró como parte de otra etapa fuera del alcance de los avances hasta el día 16/10/2026)
-
-## Notas para la evaluación
-- Se revocaron todas las llaves de API KEY de Gemini usadas en las pruebas..
-- La SECRET KEY y la contraseña de PostgreSQL fueron cambiadas.
-- test_matching ya no se contempla como archivo viable. Su contenido pasó a test_matching_engine.py. Se omite.
-- El calculo y recalculo de match se ha dejado solo para cambios del CV (accediendo explicitamente desde cv_profile.html), y postulación desde index.html. Las vacantes cerradas y vencidas ya no recalculan el matching al reabrir.

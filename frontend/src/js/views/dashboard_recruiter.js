@@ -276,7 +276,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (userRole === "admin") {
         buttons += `
         <button class="btn btn-outline-danger btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="delete">
-          <i class="bi bi-trash"></i> Eliminar
+          <i class="bi bi-trash"></i> Archivar
         </button>
       `;
       }

@@ -63,40 +63,29 @@ def make_job(status):
         soft_skills=["Comunicación"],
         deadline=None,
         benefits=None,
+        embedding=[0.4] * 384,
     )
 
 
 def test_reopening_closed_job_updates_same_record(monkeypatch):
+    """Valida que al reabrir una vacante cerrada se actualice correctamente manteniendo la política de solo deadline."""
     job = make_job("closed")
+    original_title = job.title
+    existing_embedding = job.embedding
     db = FakeDatabase(job)
     monkeypatch.setattr(jobs, "ensure_skills_cached", lambda *_args: None)
-    embedding = [0.75] * 384
 
-    def generate_after_commit(text):
-        assert db.committed
-        assert text == (
-            "Represent this sentence for searching relevant passages: "
-            "Crear y mantener servicios API"
+    def fail_if_embedding_is_generated(_text):
+        raise AssertionError(
+            "No se debe recalcular el embedding si solo se actualiza la fecha límite al reabrir."
         )
-        return embedding
 
-    monkeypatch.setattr(jobs, "generate_embedding", generate_after_commit)
+    monkeypatch.setattr(jobs, "generate_embedding", fail_if_embedding_is_generated)
     deadline = datetime.now(timezone.utc) + timedelta(days=10)
 
     result = jobs.reopen_job(
         str(job.id),
-        JobReopen(
-            title="Desarrollador API",
-            area="Ingeniería",
-            profile_type="Backend",
-            modality="remoto",
-            location=None,
-            description="Crear y mantener servicios API",
-            technical_skills=["Python", "FastAPI"],
-            soft_skills=["Comunicación"],
-            deadline=deadline,
-            benefits="Seguro médico",
-        ),
+        JobReopen(deadline=deadline),
         db,
         SimpleNamespace(id="different-recruiter-id", role="recruiter"),
     )
@@ -104,9 +93,9 @@ def test_reopening_closed_job_updates_same_record(monkeypatch):
     assert result is job
     assert result.id == job.id
     assert result.status == "active"
-    assert result.title == "Desarrollador API"
-    assert result.technical_skills == ["Python", "FastAPI"]
-    assert result.embedding == embedding
+    assert result.title == original_title
+    assert result.deadline == deadline
+    assert result.embedding == existing_embedding
     assert db.committed
 
 
@@ -187,3 +176,22 @@ def test_expired_job_rejects_changes_to_job_fields():
 
     assert error.value.status_code == 422
     assert not db.committed
+
+
+def test_reopening_job_with_null_deadline(monkeypatch):
+    """Valida que una vacante se pueda reabrir exitosamente sin especificar una fecha límite (deadline=None)."""
+    job = make_job("closed")
+    db = FakeDatabase(job)
+    monkeypatch.setattr(jobs, "ensure_skills_cached", lambda *_args: None)
+
+    result = jobs.reopen_job(
+        str(job.id),
+        JobReopen(deadline=None),
+        db,
+        SimpleNamespace(id="different-recruiter-id", role="recruiter"),
+    )
+
+    assert result is job
+    assert result.status == "active"
+    assert result.deadline is None
+    assert db.committed
