@@ -308,14 +308,6 @@ def _has_valid_cv_fields(payload: dict[str, Any]) -> bool:
                 return True
     return False
 
-## Enriquecimiento de la información del CV. Llama a la función principal enrich_cv_extraction_with_status
-def enrich_cv_extraction(
-    raw_text: str,
-    existing_data: Optional[dict[str, Any]] = None,
-) -> Optional[dict[str, Any]]:
-    """Enriquece un CV ya extraído sin completar nombre, email ni teléfono."""
-    return enrich_cv_extraction_with_status(raw_text, existing_data)["data"]
-
 ## Función principal que enriquece la extracción de datos del CV o devuelve los valores de fallback si la IA no está disponible
 def enrich_cv_extraction_with_status(
     raw_text: str,
@@ -375,13 +367,6 @@ def enrich_cv_extraction_with_status(
         logger.exception("No se pudo mezclar la respuesta enriquecida del CV.")
         return {"data": existing, "ai_available": False}
 
-## Genera el borrador de una vacante mediante IA. Llama a la función principal generate_job_draft_with_status
-def generate_job_draft(
-    instruction: str,
-    source_text: Optional[str] = None,
-) -> Optional[dict[str, Any]]:
-    """Genera un borrador de vacante en formato estricto para el formulario del frontend."""
-    return generate_job_draft_with_status(instruction, source_text)["draft"]
 
 ## Función principal para generar el borrador de una vacante o devolver una respuesta fallback si la IA no está disponible
 def generate_job_draft_with_status(
@@ -455,26 +440,12 @@ def analyze_candidate_compatibility(
         return FALLBACK_AI_ANALYSIS.copy()
     return normalized
 
-enhance_cv_extraction = enrich_cv_extraction
-extract_cv_enrichment = enrich_cv_extraction
-create_job_draft = generate_job_draft
-draft_job_from_text = generate_job_draft
-candidate_qualitative_analysis = analyze_candidate_compatibility
-evaluate_candidate_fit = analyze_candidate_compatibility
-
 __all__ = [
     "MODEL_NAME",
     "BASE_SECURITY_SYSTEM_PROMPT",
-    "enrich_cv_extraction",
     "enrich_cv_extraction_with_status",
-    "enhance_cv_extraction",
-    "generate_job_draft",
     "generate_job_draft_with_status",
-    "create_job_draft",
-    "draft_job_from_text",
     "analyze_candidate_compatibility",
-    "candidate_qualitative_analysis",
-    "evaluate_candidate_fit",
     "FALLBACK_AI_ANALYSIS",
     "FALLBACK_JOB_DRAFT",
 ]

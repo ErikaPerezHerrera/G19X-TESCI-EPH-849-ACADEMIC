@@ -399,7 +399,7 @@ def calculate_match(
 ## Función que recopila las habilidades técnicas en Vacante y Cv, las normaliza, las busca en skills_cache y crea un diccionario con las habilidades encontradas para su consulta rápida
 def _load_skill_aliases(
     db: Session, job: Job, resume: Resume
-) -> dict[str, str]:
+    ) -> dict[str, str]:
     parsed_data = resume.parsed_data or {}
     terms: list[str] = []
     for skill_list in (
@@ -443,21 +443,7 @@ def recalculate_application_match(
     application.is_overqualified = result["is_overqualified"]
     return application
 
-## Función que actualiza el matching al actualizar una vacante (por cambio de fecha y estatus de EXPIRED a ACIVE)
-def recalculate_job_applications(db: Session, job_id: Any) -> int:
-    applications = (
-        db.query(Application)
-        .options(joinedload(Application.job), joinedload(Application.resume))
-        .filter(Application.job_id == job_id)
-        .all()
-    )
-    for application in applications:
-        recalculate_application_match(application, db)
-    if applications:
-        db.commit()
-    return len(applications)
-
-## Función que actualiza el matching al actualizar un CV (por aplicar una vacante o el usuario registrado guarda cambios del CV).
+## Función que actualiza el matching al actualizar un CV (o aplicar a una vacante siendo usuario casual)
 def recalculate_resume_applications(db: Session, resume_id: Any) -> int:
     applications = (
         db.query(Application)
