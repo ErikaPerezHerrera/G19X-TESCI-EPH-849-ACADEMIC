@@ -4,22 +4,6 @@ from datetime import datetime, timezone, timedelta
 
 from app.core.database import SessionLocal
 from app.main import app
-from app.models.application import Application
-from app.models.job import Job
-from app.models.resume import Resume
-from app.models.user import User
-
-
-def reset_database():
-    db = SessionLocal()
-    try:
-        db.query(Application).delete()
-        db.query(Resume).delete()
-        db.query(Job).delete()
-        db.query(User).delete()
-        db.commit()
-    finally:
-        db.close()
 
 
 def get_auth_token_for_user(
@@ -49,14 +33,15 @@ def create_mock_resume_and_job(
     recruiter_token: str,
     candidate_email: str = "candidate@example.com",
 ):
-    """Función de apoyo para crear un CV y una Vacante activa en la BD para las pruebas."""
+    """Función de apoyo para crear un CV y una Vacante activa en la BD de pruebas."""
+    from app.models.user import User
+    from app.models.resume import Resume
+
     db = SessionLocal()
     try:
-        # Creamos un usuario candidato opcional o dejamos que sea registrado
         user_res = db.query(User).filter(User.email == candidate_email).first()
         user_id = str(user_res.id) if user_res else None
 
-        # Insertar un Resume directamente en la base de datos de prueba (usando parsed_data para el título)
         resume = Resume(
             candidate_email=candidate_email,
             parsed_data={
@@ -71,7 +56,6 @@ def create_mock_resume_and_job(
         db.refresh(resume)
         resume_id = str(resume.id)
 
-        # Crear Vacante usando la API real del reclutador
         future_deadline = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
         with patch(
             "app.api.v1.endpoints.jobs.generate_embedding", return_value=[0.1] * 384
@@ -99,19 +83,15 @@ def create_mock_resume_and_job(
 
 def test_create_application_success():
     """Valida que un candidato pueda postularse exitosamente a una vacante activa."""
-    reset_database()
     with TestClient(app) as client:
         recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
         candidate_email = "candidate@example.com"
-
-        # Registrar también al candidato para que esté logueado
         candidate_token = get_auth_token_for_user(client, candidate_email)
 
         resume_id, job_id = create_mock_resume_and_job(
             client, recruiter_token, candidate_email
         )
 
-        # Mockeamos el cálculo del matching para aislar la prueba de dependencias vectoriales pesadas
         with patch(
             "app.api.v1.endpoints.applications.recalculate_application_match",
             return_value=None,
@@ -134,7 +114,6 @@ def test_create_application_success():
 
 def test_create_application_email_mismatch_fails():
     """Valida que falle la postulación si el correo ingresado no coincide con el del CV."""
-    reset_database()
     with TestClient(app) as client:
         recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
         resume_id, job_id = create_mock_resume_and_job(
@@ -145,7 +124,7 @@ def test_create_application_email_mismatch_fails():
             f"/api/v1/jobs/{job_id}/applications",
             json={
                 "resume_id": resume_id,
-                "candidate_email": "wrong@example.com",  # Correo distinto al del CV
+                "candidate_email": "wrong@example.com",
             },
         )
 
@@ -155,7 +134,6 @@ def test_create_application_email_mismatch_fails():
 
 def test_duplicate_application_fails():
     """Valida que no se permita postularse dos veces a la misma vacante con el mismo correo."""
-    reset_database()
     with TestClient(app) as client:
         recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
         email = "candidate@example.com"
@@ -170,11 +148,9 @@ def test_duplicate_application_fails():
             "app.api.v1.endpoints.applications.recalculate_application_match",
             return_value=None,
         ):
-            # Primera postulación (Exitosa)
             res1 = client.post(f"/api/v1/jobs/{job_id}/applications", json=payload)
             assert res1.status_code == 201
 
-            # Segunda postulación (Debe fallar por duplicada)
             res2 = client.post(f"/api/v1/jobs/{job_id}/applications", json=payload)
             assert res2.status_code == 409
             assert "Ya existe una postulación" in res2.json()["detail"]
@@ -182,7 +158,6 @@ def test_duplicate_application_fails():
 
 def test_list_my_applications():
     """Valida que un usuario registrado pueda consultar su lista personal de postulaciones."""
-    reset_database()
     with TestClient(app) as client:
         recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
         candidate_email = "candidate@example.com"
@@ -215,7 +190,6 @@ def test_list_my_applications():
 
 def test_recruiter_lists_and_rejects_application():
     """Valida que el reclutador pueda listar los candidatos de una vacante y rechazar uno."""
-    reset_database()
     with TestClient(app) as client:
         recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
         candidate_email = "candidate@example.com"
@@ -233,15 +207,18 @@ def test_recruiter_lists_and_rejects_application():
             )
         application_id = create_app_res.json()["id"]
 
-        # El reclutador lista las postulaciones de su vacante
-        list_res = client.get(
+        list_res = client.post(  # o get según tu ruta de listado
             f"/api/v1/jobs/{job_id}/applications",
             headers={"Authorization": f"Bearer {recruiter_token}"},
         )
-        assert list_res.status_code == 200
-        assert len(list_res.json()) == 1
+        # Nota: ajusta si tu listado usa GET
+        list_get_res = client.get(
+            f"/api/v1/jobs/{job_id}/applications",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert list_get_res.status_code == 200
+        assert len(list_get_res.json()) == 1
 
-        # El reclutador descarta/rechaza la postulación
         reject_res = client.patch(
             f"/api/v1/applications/{application_id}/reject",
             headers={"Authorization": f"Bearer {recruiter_token}"},

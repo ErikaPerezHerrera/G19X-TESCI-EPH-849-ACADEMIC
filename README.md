@@ -117,6 +117,7 @@ plurijob/
 │   │   │   └── vector_service.py		 # Generación de embeddings.
 │   │   │
 │   ├── tests/                     # Algunas pruebas Unitarias y de Integración (pytest)
+│   │   ├── conftest.py
 │   │   ├── test_applications.py
 │   │   ├── test_auth.py
 │   │   ├── test_job_draft.py
@@ -140,6 +141,9 @@ plurijob/
 │   │   └── favicon.ico
 │   │
 │   ├── src/                       # Código Fuente
+│   │   ├── css/                   # Carpeta de archivos CSS (Estilos)
+│   │   │   ├── styles.css         # Estilos extra aplicados (actualmente solo jobs.html lo usa)
+│   │   │
 │   │   ├── js/                    # Módulos JavaScript (Consumo de API REST / Renderizado)
 │   │   │   ├── views/             # Lógica de interacción por vista
 │   │   │   │   ├── casual_user.js			# Subida de CV, filtros de búsqueda
@@ -221,13 +225,21 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
 - Por defecto Docker Desktop asigna una cantidad prudente de recursos de tu PC (2GB de RAM aproximadamente). Si en algún momento notas que los contenedores se detienen solos o tardan demasiado, puedes revisar desde Docker Desktop, en Settings > Resources que tenga suficiente memoria RAM asignada.
 
 ## Restricciones
-- Si el sistema se prueba sin restaurar la base de datos con `backup.sql`, el primer usuario que se registre desde `signup.html` tendrá el rol **"admin"**, y podrá registrar reclutadores.
+- Si el sistema se usa sin restaurar la base de datos con `backup.sql`, el primer usuario que se registre desde `signup.html` tendrá el rol **"admin"**, y podrá registrar reclutadores.
 - Si una persona sin registro se postula a una vacante, su CV vence en 12 meses. Al registrarse, se elimina la fecha de vencimiento del CV.
+- Un candidato tiene un límite de 3 postulaciones máximo. Esto con el fin de reducir la posibilidad de sobrecarga por peticiones en el servicio de Gemini.
 
 ## Ejecución de Pruebas
-El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el motor de matching, autenticación, procesamiento de archivos y manejo de base de datos en el backend, entre otras funciones. Si se quieren ejecutar debes configurar e instalar el proyecto. No necesitas instalar nada más.
+El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el motor de matching, autenticación, procesamiento de archivos y manejo de base de datos en el backend, entre otras funciones. Para ejecutar las pruebas almacenadas en `backend/tests/` se tiene que levantar el sistema tal cual está descrito en la sección **Configurar e Instalar**. No requiere la instalación de **pytest** porque este ya está incluido en el archivo `requirements.txt` (que Docker usa para crear el contenedor).
 
-- Para ejecutar todas las pruebas ejecuta desde la carpeta principal del proyecto:
+**Atención:** (**nombreContenedor**, **nombreUsuarioBasedeDatos** deben ser los mismos que se usaron en docker-compose.yml, porque la base se va a crear en el mismo contenedor).
+
+Si se quieren ejecutar debes seguir los siguientes pasos:
+1. Crea una base de datos de prueba ejecutando en la terminal (Shell) en la ubicación de la carpeta principal del proyecto:
+  ```
+  docker exec -it nombreContenedor psql -U nombreUsuarioBasedeDatos -c "CREATE DATABASE plurijob_test;"
+  ```
+2. Para ejecutar todas las pruebas ejecuta desde la carpeta principal del proyecto:
   ```
   python -m pytest
   ```

@@ -96,8 +96,6 @@ def create_application(
         if current_user
         else (func.lower(Application.candidate_email) == candidate_email)
     )
-    # Opcional: si manejas un estatus específico para filtrar las activas (ej: excluyendo rechazadas por si acaso queda alguna)
-    # active_query = active_query.filter(Application.status != "rejected")
 
     active_applications_count = active_query.count()
     if active_applications_count >= 3:
@@ -176,31 +174,38 @@ def list_my_applications(
 ## Ruta para que el candidato cancele (elimine) su postulación
 @router.delete("/applications/{application_id}", status_code=status.HTTP_200_OK)
 def cancel_application(
-    application_id: UUID,
+    application_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    ):
-    # Buscar la postulación
+    current_user: User = Depends(get_current_user),  # Exige token de sesión obligatorio
+):
+    # Buscar la postulación en la base de datos
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Postulación no encontrada.",
+            status_code=status.HTTP_404_NOT_FOUND, detail="La postulación no existe."
         )
 
-    # Validar que pertenezca al usuario autenticado (si la postulación tiene user_id asociado)
-    # O validar por correo si el usuario es casual/registrado y coincide con su email
-    if application.user_id and application.user_id != current_user.id:
+    # Validar propiedad: si la postulación tiene un user_id asignado, debe coincidir con el usuario actual.
+    # Si no tiene user_id, comparamos el correo (application.candidate_email contra current_user.email).
+    is_owner = False
+    if application.user_id and str(application.user_id) == str(current_user.id):
+        is_owner = True
+    elif (
+        application.candidate_email
+        and application.candidate_email.lower() == current_user.email.lower()
+    ):
+        is_owner = True
+
+    if not is_owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para cancelar esta postulación.",
+            detail="No tienes permiso para cancelar esta postulación.",
         )
-    
-    # Eliminar físicamente la postulación para liberar el cupo y evitar recálculos de match
+
+    # Procedemos a eliminar o cancelar la postulación de forma segura
     db.delete(application)
     db.commit()
-
-    return {"message": "Postulación cancelada y eliminada correctamente."}
+    return {"message": "Postulación cancelada con éxito"}
 
 
 ## Ruta específica en la que el usuario autenticado es reclutador, para listar postulaciones de una vacante
