@@ -377,8 +377,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   }
-
-  // Soporte para modo reapertura
+  // Soporte para modo reapertura (si viene desde el dashboard)
   if (modeParam && modeParam.startsWith("reopen-") && jobIdParam) {
     try {
       const response = await fetch(`${API_BASE_URL}/jobs/${jobIdParam}`, {
@@ -387,6 +386,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       const job = await response.json();
       if (!response.ok) throw new Error("No se pudo cargar la vacante.");
 
+      // 1. Ocultar selector de modos y mostrar el workspace directamente
+      if (modeSelectionContainer)
+        modeSelectionContainer.classList.add("d-none");
+      if (workspaceContainer) workspaceContainer.classList.remove("d-none");
+      if (quickSwitchSidebar) quickSwitchSidebar.classList.add("d-none"); // Opcional: ocultar barra lateral en reapertura si deseas espacio completo
+      if (mainWorkspaceCol) mainWorkspaceCol.className = "col-lg-12";
+      if (templatesSection) templatesSection.classList.add("d-none");
+      if (aiDraftSection) aiDraftSection.classList.add("d-none");
+      if (formAndAiWorkspace) formAndAiWorkspace.classList.remove("d-none");
+
+      // Ocultar barra lateral de "Cambiar modo" y sección de plantillas/IA
+      if (quickSwitchSidebar) quickSwitchSidebar.classList.add("d-none");
+      if (templatesSection) templatesSection.classList.add("d-none");
+      if (aiDraftSection) aiDraftSection.classList.add("d-none");
+      if (mainWorkspaceCol) mainWorkspaceCol.className = "col-lg-12";
+
+      // Ocultar el botón "Cambiar modo" de la cabecera del formulario <---
+      const backToSelectionFormBtn = document.getElementById(
+        "backToSelectionFormBtn",
+      );
+      if (backToSelectionFormBtn)
+        backToSelectionFormBtn.classList.add("d-none");
+
+      // Ocultar el botón de "Limpiar" formulario <---
+      const clearBtn = document.querySelector(
+        "#publishJobForm button[type='reset']",
+      );
+      if (clearBtn) clearBtn.classList.add("d-none");
+
+      // 2. Rellenar los campos con la información de la vacante
       fields.title.value = job.title || "";
       fields.area.value = job.area || "";
       fields.profileType.value = job.profile_type || "";
@@ -396,18 +425,33 @@ document.addEventListener("DOMContentLoaded", async () => {
       fields.benefits.value = job.benefits || "";
       fields.technicalSkills.value = (job.technical_skills || []).join(", ");
       fields.softSkills.value = (job.soft_skills || []).join(", ");
+      fields.deadline.value = ""; // Limpia la fecha para que el usuario elija una nueva posterior al día actual
 
-      switchViewMode("manual");
-      if (formHeaderTitle) formHeaderTitle.textContent = "Reabrir vacante";
+      // 3. Deshabilitar los campos de texto (solo dejar activo el selector de fecha y el botón de submit)
+      Object.keys(fields).forEach((key) => {
+        if (key !== "deadline" && fields[key]) {
+          fields[key].disabled = true;
+          fields[key].classList.add("bg-light"); // Estilo visual de campo bloqueado
+        }
+      });
+
+      // 4. Cambiar textos y títulos de la cabecera
+      if (formHeaderTitle) {
+        formHeaderTitle.innerHTML =
+          '<i class="bi bi-calendar-plus me-2"></i>Reabrir vacante (Extender fecha límite)';
+      }
       if (submitButton) {
         submitButton.innerHTML =
           '<i class="bi bi-calendar-plus me-2"></i>Guardar y reabrir';
       }
     } catch (error) {
-      alert(error.message);
+      console.error(error);
+      alert(error.message || "No se pudo cargar la vacante para reabrir.");
       window.location.href = "jobs.html";
     }
   }
+
+  // Envío del Formulario
   // Envío del Formulario
   jobForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -426,27 +470,35 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    const skills = (field) =>
-      field.value
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-    const payload = {
-      title: fields.title.value.trim(),
-      area: fields.area.value.trim(),
-      profile_type: fields.profileType.value.trim(),
-      modality: fields.modality.value,
-      location: fields.location.value.trim() || null,
-      description: fields.description.value.trim(),
-      technical_skills: skills(fields.technicalSkills),
-      soft_skills: skills(fields.softSkills),
-      deadline: deadline,
-      benefits: fields.benefits.value.trim() || null,
-    };
-
-    // Verificamos si realmente es una reapertura clásica o creación normal/plantilla
     const isReopen = modeParam && modeParam.startsWith("reopen-");
+
+    // Construcción dinámica del payload según el modo
+    let payload = {};
+    if (isReopen) {
+      // Para reabrir, el backend exige estrictamente enviar solo la fecha límite
+      payload = { deadline };
+    } else {
+      // Para crear o usar plantilla, se envían todos los campos del formulario
+      const skills = (field) =>
+        field.value
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+      payload = {
+        title: fields.title.value.trim(),
+        area: fields.area.value.trim(),
+        profile_type: fields.profileType.value.trim(),
+        modality: fields.modality.value,
+        location: fields.location.value.trim() || null,
+        description: fields.description.value.trim(),
+        technical_skills: skills(fields.technicalSkills),
+        soft_skills: skills(fields.softSkills),
+        deadline,
+        benefits: fields.benefits.value.trim() || null,
+      };
+    }
+
     const url = isReopen
       ? `${API_BASE_URL}/jobs/${jobIdParam}/reopen`
       : `${API_BASE_URL}/jobs`;
@@ -466,13 +518,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        // Imprimimos el detalle exacto que manda FastAPI en la consola para depurar fácil
-        console.error("Detalle del error 422 de FastAPI:", data);
-        throw new Error(
-          data.detail
-            ? JSON.stringify(data.detail)
-            : "No se pudo guardar la vacante.",
-        );
+        console.error("Detalle del error 422:", data);
+        throw new Error(data.detail || "No se pudo guardar la vacante.");
       }
 
       alert(
@@ -482,7 +529,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
       window.location.href = "jobs.html";
     } catch (error) {
-      alert("Error al guardar.");
+      console.error(error);
+      alert(error.message || "Error al guardar.");
     } finally {
       if (submitButton) submitButton.disabled = false;
     }

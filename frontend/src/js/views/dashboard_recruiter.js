@@ -357,6 +357,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
 
           const mode = job.status === "expired" ? "expired" : "closed";
+          // Redirige a publish.html enviando el modo y el id de la vacante
           window.location.href = `publish.html?mode=reopen-${mode}&id=${encodeURIComponent(job.id)}`;
           return;
         }
