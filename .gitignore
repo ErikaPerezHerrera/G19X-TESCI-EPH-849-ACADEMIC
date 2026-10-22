@@ -4,7 +4,6 @@ __pycache__
 .venv
 .pytest_cache
 .vscode
-_tests_
 .env
 docker-compose.yml
 *.env

@@ -182,12 +182,8 @@ plurijob/
 A continuación se leerá el archivo **Dockerfile** y comenzarán a descargarse los requerimientos extra descritos en **requirements.txt**. De igual forma, se buscará la base de datos Plurjob y si esta no existe, se creará de forma automática con el archivo `init_db.sql`. (No incluye la ejecución de `backup.sql`, la base de datos se inicia casí vacia con excepción de las tablas email_templates y skills_cache).
 Espera hasta que en la terminal aparezca el mensaje `plurijob-api INFO: Application startup complete`.
 
-6. Abre una terminal y navega hasta la carpeta principal del proyecto. Ejecuta el siguiente comando:
-  ```
-python -m http.server 5500 --bind 127.0.0.1
-  ```
-7. Copia la siguiente dirección y pégala en tu navegador para probar el sistema de forma local: 
-`http://127.0.0.1:5500/frontend/src/pages/index.html`
+6. Copia la siguiente dirección y pégala en tu navegador para probar el sistema de forma local: 
+`http://127.0.0.1:5500/src/pages/` ó `http://localhost:5500/src/pages/`
 
 ## Respaldo de la base de datos
 Este proyecto tiene en la carpeta `backend/app/db/`:
@@ -204,7 +200,7 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
   docker cp .\backend\app\db\backup.sql nombreContenedor:/tmp/backup.sql
   docker exec -it nombreContenedor psql -U nombreUsuarioBasedeDatos -d nombreBasedeDatos -f /tmp/backup.sql
   ```
-**nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml` y `backend.env`.
+**nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml` y `backend/.env`.
 
 ### Notas importantes
 - El volumen `postgres_data` asegura que los datos persistan aunque se reinicie el contenedor.
