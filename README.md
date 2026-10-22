@@ -117,11 +117,14 @@ plurijob/
 │   │   │   └── vector_service.py		 # Generación de embeddings.
 │   │   │
 │   ├── tests/                     # Algunas pruebas Unitarias y de Integración (pytest)
+│   │   ├── test_applications.py
 │   │   ├── test_auth.py
 │   │   ├── test_job_draft.py
 │   │   ├── test_job_reopening.py
+│   │   ├── test_job_skill_extraction.py
+│   │   ├── test_jobs_management.py
 │   │   ├── test_matching_engine.py
-│   │   ├── test_matching.py
+│   │   ├── test_pdf_extraction.py
 │   │   ├── test_record_embeddings.py
 │   │   ├── test_resume_ai_enrichment.py
 │   │   └── test_resume_skill_extraction.py
@@ -200,7 +203,7 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
   docker cp .\backend\app\db\backup.sql nombreContenedor:/tmp/backup.sql
   docker exec -it nombreContenedor psql -U nombreUsuarioBasedeDatos -d nombreBasedeDatos -f /tmp/backup.sql
   ```
-**nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml` y `backend/.env`.
+**nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml` y `backend/.env` (mismos datos de los Accesos de prueba)
 
 ### Notas importantes
 - El volumen `postgres_data` asegura que los datos persistan aunque se reinicie el contenedor.
@@ -222,24 +225,30 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
 - Si una persona sin registro se postula a una vacante, su CV vence en 12 meses. Al registrarse, se elimina la fecha de vencimiento del CV.
 
 ## Ejecución de Pruebas
-El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el motor de matching, autenticación, procesamiento de archivos y manejo de base de datos en el backend, entre otras funciones.
+El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el motor de matching, autenticación, procesamiento de archivos y manejo de base de datos en el backend, entre otras funciones. Si se quieren ejecutar debes configurar e instalar el proyecto. No necesitas instalar nada más.
 
 - Para ejecutar todas las pruebas ejecuta desde la carpeta principal del proyecto:
   ```
-  pytest
+  python -m pytest
   ```
 - Para ejecutar un archivo en específico, escribe la ruta completa hacia el archivo, por ejemplo:
   ```
-  pytest backend/tests/test_archivo_de_ejemplo.py
+  python -m pytest backend/tests/test_archivo_de_ejemplo.py
   ```
 Y si deseas ver el nombre exacto de cada función de prueba conforme se va ejecutando y su estatus individual, añade la bandera -v:
   ```
-  pytest -v
+  python -m pytest -v
   ```
 ó
   ```
-pytest backend/tests/test_archivo_de_ejemplo.py -v
+  python -m pytest backend/tests/test_archivo_de_ejemplo.py -v
   ```
 ## Falta por implementar
 - Manejo de las diferentes etapas del proceso de selección: por el momento solo se ve el estatus received para el candidato, y el reclutador o admin pueden rechazar la postulación.
 - Envio de correos a los candidatos según la fase en la que se encuantra su proceso. Sin embargo, se contemplaron plantillas disponibles en la base de datos (tabla email_templates). (En el documento `MVP.md` se consideró como parte de otra etapa fuera del alcance de los avances hasta el día 16/10/2026)
+
+## Notas para la evaluación
+- Se revocaron todas las llaves de API KEY de Gemini usadas en las pruebas..
+- La SECRET KEY y la contraseña de PostgreSQL fueron cambiadas.
+- test_matching ya no se contempla como archivo viable. Su contenido pasó a test_matching_engine.py. Se omite.
+- El calculo y recalculo de match se ha dejado solo para cambios del CV (accediendo explicitamente desde cv_profile.html), y postulación desde index.html. Las vacantes cerradas y vencidas ya no recalculan el matching al reabrir.

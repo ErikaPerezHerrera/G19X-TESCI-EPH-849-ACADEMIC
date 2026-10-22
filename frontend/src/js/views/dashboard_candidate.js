@@ -108,6 +108,41 @@ async function loadDashboardData() {
   }
 }
 
+// Función para confirmar y eliminar/cancelar la postulación
+async function cancelApplication(applicationId) {
+    if (!window.confirm("¿Estás seguro de que deseas cancelar esta postulación? Esta acción liberará tu espacio para postularte a otra vacante.")) {
+        return;
+    }
+
+    try {
+        const token = localStorage.getItem("access_token");
+        const headers = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const response = await fetch(`${API_BASE_URL}/applications/${applicationId}`, {
+            method: "DELETE",
+            headers: headers
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || "No se pudo cancelar la postulación.");
+        }
+
+        alert("Postulación cancelada con éxito.");
+        
+        // Refrescar la tabla de postulaciones del usuario si existe la función, o recargar la página
+        if (typeof loadUserApplications === "function") {
+            loadUserApplications();
+        } else {
+            location.reload();
+        }
+
+    } catch (error) {
+        alert(`Error al cancelar: ${error.message}`);
+    }
+}
+
 // Cargar la tabla con postulaciones del candidato
 function renderApplicationsTable(apps) {
   const tableBody = document.getElementById("applicationsTableBody");
@@ -164,6 +199,9 @@ function renderApplicationsTable(apps) {
                 >
                   <i class="bi bi-list-check"></i> Detalles del match
                 </button>
+                <button class="btn btn-sm btn-outline-danger cancel-app-btn" data-id="${escapeHtml(app.id)}">
+                  <i class="bi bi-trash"></i> Cancelar
+                </button>
               </div>
             </td>
           </tr>
@@ -186,6 +224,14 @@ function renderApplicationsTable(apps) {
     btn.addEventListener("click", (e) => {
       const appId = e.currentTarget.getAttribute("data-id");
       openJobModal(appId);
+    });
+  });
+
+  // Adjuntar event listeners a los botones "Cancelar"
+  document.querySelectorAll(".cancel-app-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const appId = e.currentTarget.getAttribute("data-id");
+      cancelApplication(appId);
     });
   });
 }

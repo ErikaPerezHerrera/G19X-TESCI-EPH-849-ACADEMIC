@@ -25,6 +25,7 @@ from app.services.skill_cache_service import ensure_skills_cached
 
 router = APIRouter(prefix="", tags=["applications"])
 
+
 ## Ruta para crear una postulación a una vacante
 @router.post(
     "/jobs/{job_id}/applications",
@@ -88,6 +89,23 @@ def create_application(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="El CV no pertenece al usuario autenticado.",
         )
+
+    # LÍMITE DE POSTULACIONES: Comprobar si el usuario ya tiene 3 o más postulaciones activas
+    active_query = db.query(Application).filter(
+        (Application.user_id == current_user.id)
+        if current_user
+        else (func.lower(Application.candidate_email) == candidate_email)
+    )
+    # Opcional: si manejas un estatus específico para filtrar las activas (ej: excluyendo rechazadas por si acaso queda alguna)
+    # active_query = active_query.filter(Application.status != "rejected")
+
+    active_applications_count = active_query.count()
+    if active_applications_count >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Has alcanzado el límite máximo de 3 postulaciones activas simultáneas. Debes cancelar alguna para postularte a otra.",
+        )
+
     # Verifica si ya existe una postulación para la misma vacante y correo electrónico
     existing_application = (
         db.query(Application)
@@ -141,6 +159,7 @@ def create_application(
 
     return application
 
+
 ## Ruta para listar postulaciones del usuario autenticado
 @router.get("/applications/me", response_model=list[ApplicationOut])
 def list_my_applications(
@@ -153,6 +172,37 @@ def list_my_applications(
         .all()
     )
 
+
+## NUEVA RUTA: Para que el candidato cancele (elimine) su postulación
+@router.delete("/applications/{application_id}", status_code=status.HTTP_200_OK)
+def cancel_application(
+    application_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Buscar la postulación
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Postulación no encontrada.",
+        )
+
+    # Validar que pertenezca al usuario autenticado (si la postulación tiene user_id asociado)
+    # O validar por correo si el usuario es casual/registrado y coincide con su email
+    if application.user_id and application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para cancelar esta postulación.",
+        )
+    
+    # Eliminar físicamente la postulación para liberar el cupo y evitar recálculos de match
+    db.delete(application)
+    db.commit()
+
+    return {"message": "Postulación cancelada y eliminada correctamente."}
+
+
 ## Ruta específica en la que el usuario autenticado es reclutador, para listar postulaciones de una vacante
 @router.get("/jobs/{job_id}/applications", response_model=list[ApplicationOut])
 def list_job_applications(
@@ -162,11 +212,14 @@ def list_job_applications(
 ):
     return (
         db.query(Application)
-        .options(joinedload(Application.resume))  # <--- Carga los datos del CV/Resume asociado
+        .options(
+            joinedload(Application.resume)
+        )  # <--- Carga los datos del CV/Resume asociado
         .filter(Application.job_id == job_id)
         .order_by(Application.match_score.desc().nullslast())
         .all()
     )
+
 
 ## Ruta específica en la que el usuario autenticado es reclutador, para descartar una postulación
 @router.patch("/applications/{application_id}/reject", response_model=ApplicationOut)
@@ -185,7 +238,7 @@ def reject_application(
 
     application.status = "rejected"
     application.rejection_reason = payload.rejection_reason
-    
+
     db.commit()
     db.refresh(application)
 

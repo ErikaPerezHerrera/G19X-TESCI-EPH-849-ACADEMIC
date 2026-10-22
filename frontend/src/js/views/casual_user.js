@@ -485,21 +485,17 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Error: No se identificó la vacante.");
       return;
     }
-    if(!token){
-          const existingResumeNotice =
-            "Si ya tenías otro CV, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
-          if (
-            !window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")
-          ) {
-            return;
-          }
-    }
-    if (token) {
+
+    if (!token) {
+      const existingResumeNotice =
+        "Si ya tenías otro CV, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
+      if (!window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")) {
+        return;
+      }
+    } else {
       const existingResumeNotice =
         "Esta es la información que se tomará en cuenta para tu postulación.";
-      if (
-        !window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")
-      ) {
+      if (!window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")) {
         return;
       }
     }
@@ -542,57 +538,75 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const resumePayload = {
-      candidate_email: safeCandidateEmail,
-      raw_text: extractedResumeData?.raw_text || "",
-      parsed_data: {
-        ...(extractedResumeData?.parsed_data || {}),
-        full_name: document.getElementById("candidateFullName").value.trim(),
-        phone: document.getElementById("candidatePhone").value.trim(),
-        address: document.getElementById("candidateAddress").value.trim(),
-        professional_title: document
-          .getElementById("candidateTitle")
-          .value.trim(),
-        work_experience: document
-          .getElementById("candidateExperience")
-          .value.trim(),
-        more_info:
-          document.getElementById("candidateMoreInfo")?.value.trim() || "",
-        technical_skills: techSkillsList,
-        soft_skills: softSkillsList,
-      },
-      extracted_skills: [...new Set([...techSkillsList, ...softSkillsList])],
-      file_name: document.getElementById("cvFileInput")?.files[0]?.name || null,
-    };
-
     const submitBtn = document.getElementById("submitApplicationBtn");
     submitBtn.disabled = true;
     submitBtn.innerHTML =
       '<span class="spinner-border spinner-border-sm" role="status"></span> Enviando...';
 
     try {
-      const token = localStorage.getItem("access_token");
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const resumeResponse = await fetch(`${API_BASE_URL}/resumes`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(resumePayload),
-      });
+      let resumeId = null;
 
-      if (!resumeResponse.ok) {
-        const errorData = await resumeResponse.json();
-        throw new Error(
-          typeof errorData.detail === "string"
-            ? errorData.detail
-            : "No se pudo guardar el CV.",
-        );
+      // SI NO HAY TOKEN (Usuario Casual): Creamos/Guardamos el CV primero
+      if (!token) {
+        const resumePayload = {
+          candidate_email: safeCandidateEmail,
+          raw_text: extractedResumeData?.raw_text || "",
+          parsed_data: {
+            ...(extractedResumeData?.parsed_data || {}),
+            full_name: document
+              .getElementById("candidateFullName")
+              .value.trim(),
+            phone: document.getElementById("candidatePhone").value.trim(),
+            address: document.getElementById("candidateAddress").value.trim(),
+            professional_title: document
+              .getElementById("candidateTitle")
+              .value.trim(),
+            work_experience: document
+              .getElementById("candidateExperience")
+              .value.trim(),
+            more_info:
+              document.getElementById("candidateMoreInfo")?.value.trim() || "",
+            technical_skills: techSkillsList,
+            soft_skills: softSkillsList,
+          },
+          extracted_skills: [
+            ...new Set([...techSkillsList, ...softSkillsList]),
+          ],
+          file_name:
+            document.getElementById("cvFileInput")?.files[0]?.name || null,
+        };
+
+        const resumeResponse = await fetch(`${API_BASE_URL}/resumes`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(resumePayload),
+        });
+
+        if (!resumeResponse.ok) {
+          const errorData = await resumeResponse.json();
+          throw new Error(
+            typeof errorData.detail === "string"
+              ? errorData.detail
+              : "No se pudo guardar el CV.",
+          );
+        }
+        const savedResume = await resumeResponse.json();
+        resumeId = savedResume.id;
       }
-      const savedResume = await resumeResponse.json();
+      // SI HAY TOKEN (Usuario Registrado): Omitimos guardar el CV y usamos el ID existente
+      else {
+        resumeId = extractedResumeData?.id;
+        if (!resumeId) {
+          throw new Error("No se encontró el ID del CV asociado a tu cuenta.");
+        }
+      }
 
+      // Enviar la postulación usando el resumeId correspondiente
       const applicationPayload = {
-        resume_id: savedResume.id,
+        resume_id: resumeId,
         candidate_email: safeCandidateEmail,
       };
 
@@ -635,7 +649,7 @@ document.addEventListener("DOMContentLoaded", () => {
         '<i class="bi bi-send-check"></i> Enviar Postulación';
     }
   }
-
+  
   function showRegisterInvitationModal(email) {
     const fullName =
       document.getElementById("candidateFullName")?.value.trim() || "";
