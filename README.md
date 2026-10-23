@@ -123,6 +123,8 @@ plurijob/
 │   │   │   ├── skill_exact_match.py   # Búsqueda de habilidades exactas entre habilidades de la base.
 │   │   │   └── vector_service.py		 # Generación de embeddings.
 │   │   │
+│   │   └── main.py                # Punto de entrada FastAPI (CORS, Middlewares, Handlers, PostgreSQL, pgvector).
+│   │   
 │   ├── tests/                     # Algunas pruebas Unitarias y de Integración (pytest)
 │   │   ├── conftest.py
 │   │   ├── test_applications.py
@@ -136,8 +138,6 @@ plurijob/
 │   │   ├── test_record_embeddings.py
 │   │   ├── test_resume_ai_enrichment.py
 │   │   └── test_resume_skill_extraction.py
-│   │   │
-│   │   └── main.py                # Punto de entrada FastAPI (CORS, Middlewares, Handlers, PostgreSQL, pgvector).
 │   │
 │   ├── .env.example               # Plantilla de variables de entorno del backend
 │   ├── Dockerfile                 # Imagen Docker para el servidor FastAPI
@@ -267,7 +267,7 @@ Y si deseas ver el nombre exacto de cada función de prueba conforme se va ejecu
 ```
 docker exec -it nombreContenedor python -m pytest
 ```
-- Localmente: Para ejecutar python -m pytest desde tu máquina local, asegúrate de haber instalado previamente las dependencias ejecutando `pip install -r backend/requirements.txt` en tu propio entorno virtual.
+Para ejecutar `python -m pytest` desde tu máquina local, asegúrate de haber instalado previamente las dependencias ejecutando `pip install -r backend/requirements.txt` y `pip install pytest` en tu propio entorno virtual.
 
 ## Falta por implementar
 - Manejo de las diferentes etapas del proceso de selección: por el momento solo se ve el estatus received para el candidato, y el reclutador o admin pueden rechazar la postulación.
