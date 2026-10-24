@@ -258,7 +258,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         <i class="bi bi-x-circle"></i> Cerrar
       </button>
       <button class="btn btn-outline-success btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="reopen">
-        <i class="bi bi-calendar-plus"></i> Extender fecha y reabrir
+        <i class="bi bi-calendar-plus"></i> Reabrir
       </button>
     `;
     }

@@ -579,22 +579,29 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("cvFileInput")?.files[0]?.name || null,
         };
 
-        const resumeResponse = await fetch(`${API_BASE_URL}/resumes`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(resumePayload),
-        });
+        const workExperienceValue=resumePayload.work_experience;
+        if (workExperienceValue.length<50){
+          alert("El texto de la experiencia laboral es muy corto");
+          return
+        }else{
+            const resumeResponse = await fetch(`${API_BASE_URL}/resumes`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(resumePayload),
+            });
 
-        if (!resumeResponse.ok) {
-          const errorData = await resumeResponse.json();
-          throw new Error(
-            typeof errorData.detail === "string"
-              ? errorData.detail
-              : "No se pudo guardar el CV.",
-          );
+            if (!resumeResponse.ok) {
+              const errorData = await resumeResponse.json();
+              throw new Error(
+                typeof errorData.detail === "string"
+                  ? errorData.detail
+                  : "No se pudo guardar el CV.",
+              );
+            }
+            const savedResume = await resumeResponse.json();
+            resumeId = savedResume.id;
         }
-        const savedResume = await resumeResponse.json();
-        resumeId = savedResume.id;
+        
       }
       // SI HAY TOKEN (Usuario Registrado): Omitimos guardar el CV y usamos el ID existente
       else {

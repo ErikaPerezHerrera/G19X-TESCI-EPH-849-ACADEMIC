@@ -445,7 +445,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           '<i class="bi bi-calendar-plus me-2"></i>Guardar y reabrir';
       }
     } catch (error) {
-      console.error(error);
       alert(error.message || "No se pudo cargar la vacante para reabrir.");
       window.location.href = "jobs.html";
     }
@@ -457,6 +456,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     event.preventDefault();
 
     const deadlineValue = fields.deadline.value;
+    const descriptionValue= fields.description.value
     let deadline = null;
 
     if (deadlineValue) {
@@ -467,6 +467,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
         deadline = parsedDate.toISOString();
+      }
+    }
+    
+    if(descriptionValue){
+      if(descriptionValue.length<70){
+        alert("La descripción de la vacante es muy corta.");
+        return;
       }
     }
 
@@ -518,7 +525,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        console.error("Detalle del error 422:", data);
         throw new Error(data.detail || "No se pudo guardar la vacante.");
       }
 
@@ -529,7 +535,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
       window.location.href = "jobs.html";
     } catch (error) {
-      console.error(error);
       alert(error.message || "Error al guardar.");
     } finally {
       if (submitButton) submitButton.disabled = false;

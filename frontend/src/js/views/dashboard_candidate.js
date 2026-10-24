@@ -712,27 +712,34 @@ function setupProfileFormListeners() {
           more_info: document.getElementById("moreInfo")?.value || "",
         },
       };
+      
+      const workExperienceValue=payload.work_experience;
+      if(workExperienceValue<50){
+        alert("El texto de la experiencia laboral es muy corto");
+        return;
+      }else{
+        try {
+          const response = await fetch(`${API_BASE_URL}/resumes`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          });
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/resumes`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error("Error guardando en la base de datos");
+          }
 
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error("Error guardando en la base de datos");
+          alert("¡Perfil guardado correctamente!");
+          updateProgressBar();
+        } catch (error) {
+          alert(`Error al guardar: ${error.message}`);
         }
-
-        alert("¡Perfil guardado correctamente!");
-        updateProgressBar();
-      } catch (error) {
-        alert(`Error al guardar: ${error.message}`);
       }
+      
     });
   }
 }

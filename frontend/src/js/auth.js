@@ -153,16 +153,32 @@ document.addEventListener("DOMContentLoaded", () => {
       const fullName = document.getElementById("signupName").value.trim();
       const email = document.getElementById("signupEmail").value.trim();
       const password = document.getElementById("signupPassword").value;
-
       let errorMessage = document.getElementById("signupErrorMessage");
+
       if (!errorMessage) {
         errorMessage = document.createElement("div");
         errorMessage.id = "signupErrorMessage";
         errorMessage.className = "alert alert-danger mt-3 d-none";
         signupForm.appendChild(errorMessage);
       } else {
+        // Ocultar y limpiar cualquier error previo
         errorMessage.classList.add("d-none");
         errorMessage.innerText = "";
+      }
+
+      // 2. Validar el nombre completo
+      if (fullName.length < 10) {
+        errorMessage.innerText =
+          "Tu nombre completo debe tener al menos 10 caracteres.";
+        errorMessage.classList.remove("d-none");
+        return; // Detiene la ejecución para que no continúe hacia el try-catch
+      }
+
+      // 3. Validar la contraseña
+      if (password.length < 12) {
+        errorMessage.innerText = "Tu contraseña debe tener mínimo 12 caracteres.";
+        errorMessage.classList.remove("d-none");
+        return; // Detiene la ejecución para que no continúe hacia el try-catch
       }
 
       try {
