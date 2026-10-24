@@ -282,10 +282,3 @@ ____
 
 #### Problemas con publicación de vacantes
 - El texto de la descripción del trabajo debe tener mínimo 70 caracteres para guardarse. Esto se debe a que debe haber algo de información con la que se pueda hacer el cálculo del match.
-
-_____
-Temas tentativos y sujetos a cambios:
-Motor de extracción de información
-Lógica del Matching 
-Análisis de IA
-Evaluación de Sobrecalificación
