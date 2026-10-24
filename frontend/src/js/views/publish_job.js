@@ -1,16 +1,46 @@
+//# Gestión de publicación de vacantes (Manual, IA y Plantillas) con Modales Globales
 import { API_BASE_URL } from "../config.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const jobForm = document.getElementById("publishJobForm");
   if (!jobForm) return;
 
-  const params = new URLSearchParams(window.location.search);
-  const modeParam = params.get("mode");
-  const jobIdParam = params.get("id");
   const token = localStorage.getItem("access_token");
 
+  // -------------------------------------------------------------
+  // SISTEMA DE MODALES GLOBALES (Reemplaza alert)
+  // -------------------------------------------------------------
+  function showModalAlert(title, message) {
+    return new Promise((resolve) => {
+      document.getElementById("globalAlertTitle").textContent = title;
+      document.getElementById("globalAlertMessage").textContent = message;
+
+      const cancelBtn = document.getElementById("globalAlertCancelBtn");
+      const confirmBtn = document.getElementById("globalAlertConfirmBtn");
+
+      cancelBtn.style.display = "none";
+      confirmBtn.textContent = "Aceptar";
+      confirmBtn.className = "btn btn-primary px-4";
+
+      const modalElement = document.getElementById("globalAlertModal");
+      const modal = new bootstrap.Modal(modalElement);
+
+      const handleHidden = () => {
+        confirmBtn.removeEventListener("click", handleHidden);
+        resolve();
+      };
+      modalElement.addEventListener("hidden.bs.modal", handleHidden, {
+        once: true,
+      });
+      modal.show();
+    });
+  }
+
   if (!token) {
-    alert("Debes iniciar sesión para publicar o reabrir una vacante.");
+    await showModalAlert(
+      "Sesión Requerida",
+      "Debes iniciar sesión para publicar una vacante.",
+    );
     window.location.href = "/login.html";
     return;
   }
@@ -31,7 +61,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const generateDraftButton = document.getElementById("generateJobDraftButton");
   const aiNotice = document.getElementById("jobAiNotice");
   const submitButton = jobForm.querySelector('button[type="submit"]');
-  const resetButton = jobForm.querySelector('button[type="reset"]');
 
   let selectedTemplateIdForModal = null;
   let currentStoredJobs = [];
@@ -69,10 +98,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (workspaceContainer) workspaceContainer.classList.remove("d-none");
     if (quickSwitchSidebar) quickSwitchSidebar.classList.remove("d-none");
 
-    // Ajustar columnas principales para dejar espacio a la barra lateral izquierda
     if (mainWorkspaceCol) mainWorkspaceCol.className = "col-lg-9";
 
-    // Ocultar ambas secciones internas por defecto
     if (templatesSection) templatesSection.classList.add("d-none");
     if (formAndAiWorkspace) formAndAiWorkspace.classList.add("d-none");
     if (aiDraftSection) aiDraftSection.classList.add("d-none");
@@ -97,7 +124,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Delegación de eventos robusta para las opciones iniciales
   if (modeSelectionContainer) {
     modeSelectionContainer.addEventListener("click", (e) => {
       const cardOrBtn = e.target.closest("[data-mode]");
@@ -110,7 +136,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Event Listeners para los botones de la barra lateral izquierda
   document.querySelectorAll(".switch-mode-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const mode = btn.dataset.mode;
@@ -118,7 +143,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // Botones de retorno al menú principal
   document
     .getElementById("backToSelectionBtn")
     ?.addEventListener("click", resetToMenu);
@@ -134,7 +158,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     jobForm.reset();
   }
 
-  // Cargar vacantes almacenadas (status = "stored") para usarlas como plantilla
   async function loadStoredTemplates() {
     const listContainer = document.getElementById("templatesCardsList");
     if (!listContainer) return;
@@ -267,7 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function fillFormWithTemplate(jobId) {
     const job = currentStoredJobs.find((j) => String(j.id) === String(jobId));
     if (!job) {
-      alert("No se encontró la información de la plantilla.");
+      showModalAlert("Aviso", "No se encontró la información de la plantilla.");
       return;
     }
 
@@ -377,144 +400,62 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   }
-  // Soporte para modo reapertura (si viene desde el dashboard)
-  if (modeParam && modeParam.startsWith("reopen-") && jobIdParam) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/jobs/${jobIdParam}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const job = await response.json();
-      if (!response.ok) throw new Error("No se pudo cargar la vacante.");
 
-      // 1. Ocultar selector de modos y mostrar el workspace directamente
-      if (modeSelectionContainer)
-        modeSelectionContainer.classList.add("d-none");
-      if (workspaceContainer) workspaceContainer.classList.remove("d-none");
-      if (quickSwitchSidebar) quickSwitchSidebar.classList.add("d-none"); // Opcional: ocultar barra lateral en reapertura si deseas espacio completo
-      if (mainWorkspaceCol) mainWorkspaceCol.className = "col-lg-12";
-      if (templatesSection) templatesSection.classList.add("d-none");
-      if (aiDraftSection) aiDraftSection.classList.add("d-none");
-      if (formAndAiWorkspace) formAndAiWorkspace.classList.remove("d-none");
-
-      // Ocultar barra lateral de "Cambiar modo" y sección de plantillas/IA
-      if (quickSwitchSidebar) quickSwitchSidebar.classList.add("d-none");
-      if (templatesSection) templatesSection.classList.add("d-none");
-      if (aiDraftSection) aiDraftSection.classList.add("d-none");
-      if (mainWorkspaceCol) mainWorkspaceCol.className = "col-lg-12";
-
-      // Ocultar el botón "Cambiar modo" de la cabecera del formulario <---
-      const backToSelectionFormBtn = document.getElementById(
-        "backToSelectionFormBtn",
-      );
-      if (backToSelectionFormBtn)
-        backToSelectionFormBtn.classList.add("d-none");
-
-      // Ocultar el botón de "Limpiar" formulario <---
-      const clearBtn = document.querySelector(
-        "#publishJobForm button[type='reset']",
-      );
-      if (clearBtn) clearBtn.classList.add("d-none");
-
-      // 2. Rellenar los campos con la información de la vacante
-      fields.title.value = job.title || "";
-      fields.area.value = job.area || "";
-      fields.profileType.value = job.profile_type || "";
-      fields.modality.value = job.modality || "";
-      fields.location.value = job.location || "";
-      fields.description.value = job.description || "";
-      fields.benefits.value = job.benefits || "";
-      fields.technicalSkills.value = (job.technical_skills || []).join(", ");
-      fields.softSkills.value = (job.soft_skills || []).join(", ");
-      fields.deadline.value = ""; // Limpia la fecha para que el usuario elija una nueva posterior al día actual
-
-      // 3. Deshabilitar los campos de texto (solo dejar activo el selector de fecha y el botón de submit)
-      Object.keys(fields).forEach((key) => {
-        if (key !== "deadline" && fields[key]) {
-          fields[key].disabled = true;
-          fields[key].classList.add("bg-light"); // Estilo visual de campo bloqueado
-        }
-      });
-
-      // 4. Cambiar textos y títulos de la cabecera
-      if (formHeaderTitle) {
-        formHeaderTitle.innerHTML =
-          '<i class="bi bi-calendar-plus me-2"></i>Reabrir vacante (Extender fecha límite)';
-      }
-      if (submitButton) {
-        submitButton.innerHTML =
-          '<i class="bi bi-calendar-plus me-2"></i>Guardar y reabrir';
-      }
-    } catch (error) {
-      alert(error.message || "No se pudo cargar la vacante para reabrir.");
-      window.location.href = "jobs.html";
-    }
-  }
-
-  // Envío del Formulario
-  // Envío del Formulario
+  // Envío del Formulario (Creación de nueva vacante)
   jobForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const deadlineValue = fields.deadline.value;
-    const descriptionValue= fields.description.value
+    const descriptionValue = fields.description.value;
     let deadline = null;
 
     if (deadlineValue) {
       const parsedDate = new Date(deadlineValue);
       if (!isNaN(parsedDate.getTime())) {
         if (parsedDate <= new Date()) {
-          alert("La fecha límite debe ser posterior al momento actual.");
+          await showModalAlert(
+            "Validación",
+            "La fecha límite debe ser posterior al momento actual.",
+          );
           return;
         }
         deadline = parsedDate.toISOString();
       }
     }
-    
-    if(descriptionValue){
-      if(descriptionValue.length<70){
-        alert("La descripción de la vacante es muy corta.");
+
+    if (descriptionValue) {
+      if (descriptionValue.length < 70) {
+        await showModalAlert(
+          "Validación",
+          "La descripción de la vacante es muy corta (mínimo 70 caracteres).",
+        );
         return;
       }
     }
 
-    const isReopen = modeParam && modeParam.startsWith("reopen-");
+    const skills = (field) =>
+      field.value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
 
-    // Construcción dinámica del payload según el modo
-    let payload = {};
-    if (isReopen) {
-      // Para reabrir, el backend exige estrictamente enviar solo la fecha límite
-      payload = { deadline };
-    } else {
-      // Para crear o usar plantilla, se envían todos los campos del formulario
-      const skills = (field) =>
-        field.value
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-
-      payload = {
-        title: fields.title.value.trim(),
-        area: fields.area.value.trim(),
-        profile_type: fields.profileType.value.trim(),
-        modality: fields.modality.value,
-        location: fields.location.value.trim() || null,
-        description: fields.description.value.trim(),
-        technical_skills: skills(fields.technicalSkills),
-        soft_skills: skills(fields.softSkills),
-        deadline,
-        benefits: fields.benefits.value.trim() || null,
-      };
-    }
-
-    const url = isReopen
-      ? `${API_BASE_URL}/jobs/${jobIdParam}/reopen`
-      : `${API_BASE_URL}/jobs`;
-    const method = isReopen ? "PATCH" : "POST";
+    const payload = {
+      title: fields.title.value.trim(),
+      area: fields.area.value.trim(),
+      profile_type: fields.profileType.value.trim(),
+      modality: fields.modality.value,
+      location: fields.location.value.trim() || null,
+      description: fields.description.value.trim(),
+      technical_skills: skills(fields.technicalSkills),
+      soft_skills: skills(fields.softSkills),
+      deadline,
+      benefits: fields.benefits.value.trim() || null,
+    };
 
     if (submitButton) submitButton.disabled = true;
     try {
-      const response = await fetch(url, {
-        method,
+      const response = await fetch(`${API_BASE_URL}/jobs`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -528,14 +469,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error(data.detail || "No se pudo guardar la vacante.");
       }
 
-      alert(
-        isReopen
-          ? "Vacante reabierta correctamente."
-          : "¡Vacante creada con éxito!",
-      );
+      await showModalAlert("¡Éxito!", "¡Vacante creada con éxito!");
       window.location.href = "jobs.html";
     } catch (error) {
-      alert(error.message || "Error al guardar.");
+      await showModalAlert(
+        "Error",
+        error.message || "Error al guardar la vacante.",
+      );
     } finally {
       if (submitButton) submitButton.disabled = false;
     }

@@ -1,4 +1,4 @@
-//# Subida de CV, filtros de búsqueda y autocompletado para usuarios autenticados
+//# Subida de CV, filtros de búsqueda y autocompletado con Modales Globales
 import { API_BASE_URL } from "../config.js";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -10,6 +10,84 @@ document.addEventListener("DOMContentLoaded", () => {
   const applyModal = applyModalElement
     ? new bootstrap.Modal(applyModalElement)
     : null;
+
+  const directApplyModalElement = document.getElementById("directApplyModal");
+  const directApplyModal = directApplyModalElement
+    ? new bootstrap.Modal(directApplyModalElement)
+    : null;
+
+  // -------------------------------------------------------------
+  // SISTEMA DE MODALES GLOBALES (Reemplaza alert y confirm)
+  // -------------------------------------------------------------
+  function showModalAlert(title, message) {
+    return new Promise((resolve) => {
+      document.getElementById("globalAlertTitle").textContent = title;
+      document.getElementById("globalAlertMessage").textContent = message;
+
+      const cancelBtn = document.getElementById("globalAlertCancelBtn");
+      const confirmBtn = document.getElementById("globalAlertConfirmBtn");
+
+      cancelBtn.style.display = "none";
+      confirmBtn.textContent = "Aceptar";
+      confirmBtn.className = "btn btn-primary px-4";
+
+      const modalElement = document.getElementById("globalAlertModal");
+      const modal = new bootstrap.Modal(modalElement);
+
+      const handleHidden = () => {
+        confirmBtn.removeEventListener("click", handleHidden);
+        resolve();
+      };
+      modalElement.addEventListener("hidden.bs.modal", handleHidden, {
+        once: true,
+      });
+      modal.show();
+    });
+  }
+
+  function showModalConfirm(title, message, confirmButtonText = "Confirmar") {
+    return new Promise((resolve) => {
+      document.getElementById("globalAlertTitle").textContent = title;
+      document.getElementById("globalAlertMessage").textContent = message;
+
+      const cancelBtn = document.getElementById("globalAlertCancelBtn");
+      const confirmBtn = document.getElementById("globalAlertConfirmBtn");
+
+      cancelBtn.style.display = "block";
+      cancelBtn.textContent = "Cancelar";
+      confirmBtn.textContent = confirmButtonText;
+      confirmBtn.className = "btn btn-success px-4";
+
+      const modalElement = document.getElementById("globalAlertModal");
+      const modal = new bootstrap.Modal(modalElement);
+
+      let userConfirmed = false;
+
+      const onConfirm = () => {
+        userConfirmed = true;
+        modal.hide();
+      };
+
+      const onCancel = () => {
+        userConfirmed = false;
+        modal.hide();
+      };
+
+      confirmBtn.onclick = onConfirm;
+      cancelBtn.onclick = onCancel;
+
+      const handleHidden = () => {
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        resolve(userConfirmed);
+      };
+
+      modalElement.addEventListener("hidden.bs.modal", handleHidden, {
+        once: true,
+      });
+      modal.show();
+    });
+  }
 
   // Ajuste dinámico del Navbar según la sesión iniciada
   setupNavbar();
@@ -29,7 +107,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Búsqueda exhaustiva en todas las variantes de la vacante
     const filtered = allJobs.filter((job) => {
       const searchableText = [
         job.title,
@@ -51,24 +128,27 @@ document.addEventListener("DOMContentLoaded", () => {
     renderJobs(filtered);
   };
 
-  // Eventos de escucha conectados al HTML del buscador
   document.getElementById("searchBtn")?.addEventListener("click", filterJobs);
-  searchInput?.addEventListener("input", filterJobs); // Filtra en tiempo real conforme escribes
+  searchInput?.addEventListener("input", filterJobs);
   searchInput?.addEventListener("keyup", (e) => {
     if (e.key === "Enter") filterJobs();
   });
 
-  // Evento Paso 1: Subir PDF y Extraer
+  // Evento Paso 1: Subir PDF y Extraer (Solo usuario casual)
   document
     .getElementById("extractCvBtn")
     ?.addEventListener("click", handleExtractCV);
 
-  // Evento Paso 2: Enviar Postulación
+  // Evento Paso 2: Enviar Postulación (Solo usuario casual)
   document
     .getElementById("stepConfirmCV")
     ?.addEventListener("submit", handleSendApplication);
 
-  // Reajustar modal al cerrarse
+  // Evento Confirmación Postulación Directa (Usuario Registrado)
+  document
+    .getElementById("confirmDirectApplyBtn")
+    ?.addEventListener("click", handleDirectRegisteredApplication);
+
   applyModalElement?.addEventListener("hidden.bs.modal", resetModal);
 
   // -------------------------------------------------------------
@@ -103,7 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Busca las vacantes disponibles para mostrarlas en index.html
   async function loadPublicJobs() {
     const container = document.getElementById("jobsContainer");
     try {
@@ -120,7 +199,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       renderJobs(allJobs);
     } catch (error) {
-      console.error("Error al cargar las ofertas.");
       if (container) {
         container.innerHTML = `
           <div class="col-12">
@@ -150,43 +228,44 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     container.innerHTML = jobs
-      .map(
-        (job) => `
-      <div class="col-md-6 col-lg-4 mb-4">
-        <div class="card h-100 shadow-sm border-0">
-          <div class="card-body d-flex flex-column">
-            <h5 class="card-title text-primary fw-bold mb-1">${job.title}</h5>
-            <p class="text-muted small mb-2">
-              <i class="bi bi-building"></i> ${job.area || "General"} | 
-              <i class="bi bi-laptop"></i> ${job.modality || "Presencial"}
-            </p>
-            <p class="card-text text-muted flex-grow-1 text-truncate">${job.description || ""}</p>
-            <p class="text-secondary mb-3" style="white-space: pre-line;">${job.benefits || "Sin beneficios especificados."}</p>
-            <hr>
+      .map((job) => {
+        const techSkillsHtml = (job.technical_skills || [])
+          .slice(0, 4)
+          .map(
+            (s) => `<span class="badge bg-light text-dark border">${s}</span>`,
+          )
+          .join("");
 
-            <div class="d-flex flex-wrap gap-1 mb-3">
-              ${(job.technical_skills || [])
-                .slice(0, 4)
-                .map(
-                  (s) =>
-                    `<span class="badge bg-light text-dark border">${s}</span>`,
-                )
-                .join("")}
-            </div>
+        return `
+          <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 shadow-sm border-0">
+              <div class="card-body d-flex flex-column">
+                <h5 class="card-title text-primary fw-bold mb-1">${job.title}</h5>
+                <p class="text-muted small mb-2">
+                  <i class="bi bi-building"></i> ${job.area || "General"} | 
+                  <i class="bi bi-laptop"></i> ${job.modality || "Presencial"}
+                </p>
+                <p class="card-text text-muted flex-grow-1 text-truncate">${job.description || ""}</p>
+                <p class="text-secondary mb-3" style="white-space: pre-line;">${job.benefits || "Sin beneficios especificados."}</p>
+                <hr>
 
-            <div class="d-grid gap-2">
-              <button class="btn btn-outline-secondary btn-sm view-job-detail-btn" data-job-id="${job.id}">
-                <i class="bi bi-info-circle"></i> Información
-              </button>
-              <button class="btn btn-primary w-100 open-apply-modal-btn" data-job-id="${job.id}">
-                <i class="bi bi-send"></i> Postularme
-              </button>
+                <div class="d-flex flex-wrap gap-1 mb-3">
+                  ${techSkillsHtml}
+                </div>
+
+                <div class="d-grid gap-2">
+                  <button class="btn btn-outline-secondary btn-sm view-job-detail-btn" data-job-id="${job.id}">
+                    <i class="bi bi-info-circle"></i> Información
+                  </button>
+                  <button class="btn btn-primary w-100 open-apply-modal-btn" data-job-id="${job.id}">
+                    <i class="bi bi-send"></i> Postularme
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    `,
-      )
+        `;
+      })
       .join("");
 
     document.querySelectorAll(".view-job-detail-btn").forEach((btn) => {
@@ -201,8 +280,24 @@ document.addEventListener("DOMContentLoaded", () => {
         const jobId = e.currentTarget.dataset.jobId;
         selectedJobId = jobId;
         const job = allJobs.find((j) => j.id == selectedJobId);
+        const token = localStorage.getItem("access_token");
 
         if (job) {
+          // --- FLUJO PARA USUARIO REGISTRADO: POSTULACIÓN DIRECTA SIN FORMULARIO ---
+          if (token) {
+            const titleEl = document.getElementById("directApplyJobTitle");
+            const subtitleEl = document.getElementById(
+              "directApplyJobSubtitle",
+            );
+            if (titleEl) titleEl.innerText = job.title;
+            if (subtitleEl)
+              subtitleEl.innerText = `${job.area || "General"} • ${job.modality || "Presencial"}`;
+
+            if (directApplyModal) directApplyModal.show();
+            return;
+          }
+
+          // --- FLUJO PARA USUARIO CASUAL: MANTIENE EL MODAL CON FORMULARIO/PDF ---
           const titleEl = document.getElementById("applyModalJobTitle");
           const subtitleEl = document.getElementById("applyModalJobSubtitle");
           if (titleEl) titleEl.innerText = job.title;
@@ -216,7 +311,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Muestra un modal con la información de la vacante
   function openJobDetailModal(jobId) {
     const job = allJobs.find((j) => String(j.id) === String(jobId));
     if (!job) return;
@@ -275,84 +369,114 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Cargar datos preexistentes del CV si hay sesión activa
   async function checkAndPreloadUserResume() {
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/resumes/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) return;
-
       const responseData = await response.json();
       if (!responseData) return;
 
       const data = Array.isArray(responseData) ? responseData[0] : responseData;
       if (!data) return;
-
       extractedResumeData = data;
-      const parsed = data.parsed_data || {};
-
-      document.getElementById("candidateFullName").value =
-        parsed.full_name || "";
-
-      const emailInput = document.getElementById("candidateEmail");
-      if (emailInput) {
-        emailInput.value = data.candidate_email || parsed.email || "";
-      }
-
-      const addressInput = document.getElementById("candidateAddress");
-      if (addressInput) {
-        addressInput.value =
-          parsed.address || parsed.location || data.address || "";
-      }
-
-      document.getElementById("candidatePhone").value = parsed.phone || "";
-      document.getElementById("candidateTitle").value =
-        parsed.professional_title || "";
-
-      const techSkills = parsed.technical_skills || data.extracted_skills || [];
-      const softSkills = parsed.soft_skills || [];
-
-      document.getElementById("candidateSkills").value = Array.isArray(
-        techSkills,
-      )
-        ? techSkills.join(", ")
-        : techSkills;
-
-      document.getElementById("candidateSoftSkills").value = Array.isArray(
-        softSkills,
-      )
-        ? softSkills.join(", ")
-        : softSkills;
-
-      const moreInfoInput = document.getElementById("candidateMoreInfo");
-      if (moreInfoInput) {
-        moreInfoInput.value = parsed.more_info || data.more_info || "";
-      }
-
-      let expValue = parsed.work_experience || data.work_experience || "";
-      if (Array.isArray(expValue)) {
-        expValue = expValue.join("\n\n");
-      }
-      document.getElementById("candidateExperience").value = expValue;
-
-      document.getElementById("stepUploadCV")?.classList.add("d-none");
-      document.getElementById("stepConfirmCV")?.classList.remove("d-none");
-      const confirmCvFieldset = document.getElementById("confirmCvFieldset");
-      if (confirmCvFieldset) confirmCvFieldset.disabled = true;
-
     } catch (error) {
-      console.error("Error al precargar la información del CV.");
     }
   }
 
-  // Extracción del CV (PDF)
+  // --- POSTULACIÓN DIRECTA (USUARIO REGISTRADO) ---
+  async function handleDirectRegisteredApplication() {
+    const token = localStorage.getItem("access_token");
+    if (!token || !selectedJobId) {
+      await showModalAlert(
+        "Sesión Expirada",
+        "Por favor inicia sesión nuevamente.",
+      );
+      window.location.href = "login.html";
+      return;
+    }
+
+    const confirmBtn = document.getElementById("confirmDirectApplyBtn");
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML =
+      '<span class="spinner-border spinner-border-sm" role="status"></span> Enviando...';
+
+    try {
+      const resumeRes = await fetch(`${API_BASE_URL}/resumes/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!resumeRes.ok) {
+        throw new Error(
+          "No se encontró un CV asociado a tu cuenta. Por favor sube uno en la sección 'Mi CV'.",
+        );
+      }
+
+      const resumeDataJson = await resumeRes.json();
+      const resumeObj = Array.isArray(resumeDataJson)
+        ? resumeDataJson[0]
+        : resumeDataJson;
+
+      if (!resumeObj || !resumeObj.id || !resumeObj.candidate_email) {
+        throw new Error(
+          "Datos de perfil incompletos. Actualiza tu información en 'Mi CV'.",
+        );
+      }
+
+      const applicationPayload = {
+        resume_id: resumeObj.id,
+        candidate_email: resumeObj.candidate_email,
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/jobs/${selectedJobId}/applications`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(applicationPayload),
+        },
+      );
+
+      if (!response.ok) {
+        const errData = await response.json();
+        let errorMessage = "Error al enviar la postulación.";
+        if (typeof errData.detail === "string") {
+          errorMessage = errData.detail;
+        } else if (Array.isArray(errData.detail)) {
+          errorMessage = errData.detail.map((err) => err.msg).join("\n");
+        }
+        throw new Error(errorMessage);
+      }
+
+      // 1. Ocultar el modal de postulación directa antes de mostrar el éxito
+      if (directApplyModal) directApplyModal.hide();
+
+      await showModalAlert(
+        "¡Éxito!",
+        "¡Postulación enviada con éxito! La empresa revisará tu perfil.",
+      );
+
+      window.location.href = "dashboard.html";
+    } catch (error) {
+      // 2. IMPORTANTE: Ocultar el modal de postulación antes de mostrar el error (ej. límite de 3 alcanzado)
+      if (directApplyModal) directApplyModal.hide();
+
+      await showModalAlert("Límite alcanzado", error.message);
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML =
+        '<i class="bi bi-send-check me-1"></i> Postularme Ahora';
+    }
+  }
+
   async function handleExtractCV() {
     const fileInput = document.getElementById("cvFileInput");
     const extractBtn = document.getElementById("extractCvBtn");
@@ -360,12 +484,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const file = fileInput?.files[0];
 
     if (!file) {
-      alert("Por favor selecciona un archivo PDF de tu Hoja de Vida.");
+      await showModalAlert(
+        "Archivo requerido",
+        "Por favor selecciona un archivo PDF de tu Hoja de Vida.",
+      );
       return;
     }
 
     if (file.type !== "application/pdf") {
-      alert("El archivo debe estar en formato PDF.");
+      await showModalAlert(
+        "Formato incorrecto",
+        "El archivo debe estar estrictamente en formato PDF.",
+      );
       return;
     }
 
@@ -398,7 +528,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       document.getElementById("candidateFullName").value =
         extractedResumeData.full_name || parsed.full_name || "";
-
       const emailInput = document.getElementById("candidateEmail");
       if (emailInput && !emailInput.value) {
         emailInput.value = extractedResumeData.email || parsed.email || "";
@@ -406,7 +535,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       document.getElementById("candidateAddress").value =
         extractedResumeData.address || parsed.address || parsed.location || "";
-
       document.getElementById("candidatePhone").value =
         extractedResumeData.phone || parsed.phone || "";
       document.getElementById("candidateTitle").value =
@@ -441,34 +569,26 @@ document.addEventListener("DOMContentLoaded", () => {
         experienceText = extractedResumeData.work_experience;
       } else if (Array.isArray(extractedResumeData.work_experience)) {
         experienceText = extractedResumeData.work_experience
-          .map((exp) => {
-            if (typeof exp === "object") {
-              return `${exp.title || exp.role || ""} ${exp.company ? "en " + exp.company : ""}\n${exp.description || ""}`.trim();
-            }
-            return String(exp);
-          })
+          .map((exp) =>
+            typeof exp === "object"
+              ? `${exp.title || exp.role || ""} ${exp.company ? "en " + exp.company : ""}\n${exp.description || ""}`.trim()
+              : String(exp),
+          )
           .join("\n\n");
       } else if (parsed.work_experience) {
-        const parsedExperience = parsed.work_experience;
-        experienceText = Array.isArray(parsedExperience)
-          ? parsedExperience
-              .map((item) =>
-                typeof item === "string" ? item : JSON.stringify(item),
-              )
-              .join("\n\n")
-          : parsedExperience;
-      } else if (parsed.summary) {
-        experienceText = parsed.summary;
+        experienceText = Array.isArray(parsed.work_experience)
+          ? parsed.work_experience.join("\n\n")
+          : parsed.work_experience;
       } else {
         experienceText = extractedResumeData.raw_text || "";
       }
 
       document.getElementById("candidateExperience").value =
         experienceText.trim();
-
       document.getElementById("stepConfirmCV")?.classList.remove("d-none");
     } catch (error) {
-      alert(
+      await showModalAlert(
+        "Error",
         "Ocurrió un error al procesar el PDF. Revisa el archivo e inténtalo nuevamente.",
       );
     } finally {
@@ -477,28 +597,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Envío final de la postulación
+  // --- ENVÍO FINAL (USUARIO CASUAL) ---
   async function handleSendApplication(e) {
     e.preventDefault();
     const token = localStorage.getItem("access_token");
     if (!selectedJobId) {
-      alert("Error: No se identificó la vacante.");
+      await showModalAlert("Error", "No se identificó la vacante.");
       return;
     }
 
-    if (!token) {
-      const existingResumeNotice =
-        "Si ya tenías otro CV, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
-      if (!window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")) {
-        return;
-      }
-    } else {
-      const existingResumeNotice =
-        "Esta es la información que se tomará en cuenta para tu postulación.";
-      if (!window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")) {
-        return;
-      }
-    }
+    const confirmed = await showModalConfirm(
+      "Confirmar Postulación",
+      "Si ya tenías otro CV, la información se actualizará y cualquier cambio puede afectar tu visibilidad y match en procesos activos.\n\n¿Deseas continuar?",
+      "Sí, continuar",
+    );
+    if (!confirmed) return;
 
     const skillsInput = document.getElementById("candidateSkills").value;
     const techSkillsList = skillsInput
@@ -522,7 +635,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const candidateEmail =
       candidateEmailInput?.value.trim().toLowerCase() || "";
     if (!candidateEmail) {
-      alert("Ingresa un correo electrónico para registrar tu postulación.");
+      await showModalAlert(
+        "Campo Requerido",
+        "Ingresa un correo electrónico para registrar tu postulación.",
+      );
       return;
     }
 
@@ -534,7 +650,7 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       if (candidateEmailInput) candidateEmailInput.value = safeCandidateEmail;
     } catch (error) {
-      alert(error.message);
+      await showModalAlert("Validación", error.message);
       return;
     }
 
@@ -545,73 +661,58 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
       let resumeId = null;
 
-      // SI NO HAY TOKEN (Usuario Casual): Creamos/Guardamos el CV primero
-      if (!token) {
-        const resumePayload = {
-          candidate_email: safeCandidateEmail,
-          raw_text: extractedResumeData?.raw_text || "",
-          parsed_data: {
-            ...(extractedResumeData?.parsed_data || {}),
-            full_name: document
-              .getElementById("candidateFullName")
-              .value.trim(),
-            phone: document.getElementById("candidatePhone").value.trim(),
-            address: document.getElementById("candidateAddress").value.trim(),
-            professional_title: document
-              .getElementById("candidateTitle")
-              .value.trim(),
-            work_experience: document
-              .getElementById("candidateExperience")
-              .value.trim(),
-            more_info:
-              document.getElementById("candidateMoreInfo")?.value.trim() || "",
-            technical_skills: techSkillsList,
-            soft_skills: softSkillsList,
-          },
-          extracted_skills: [
-            ...new Set([...techSkillsList, ...softSkillsList]),
-          ],
-          file_name:
-            document.getElementById("cvFileInput")?.files[0]?.name || null,
-        };
+      const resumePayload = {
+        candidate_email: safeCandidateEmail,
+        raw_text: extractedResumeData?.raw_text || "",
+        parsed_data: {
+          ...(extractedResumeData?.parsed_data || {}),
+          full_name: document.getElementById("candidateFullName").value.trim(),
+          phone: document.getElementById("candidatePhone").value.trim(),
+          address: document.getElementById("candidateAddress").value.trim(),
+          professional_title: document
+            .getElementById("candidateTitle")
+            .value.trim(),
+          work_experience: document
+            .getElementById("candidateExperience")
+            .value.trim(),
+          more_info:
+            document.getElementById("candidateMoreInfo")?.value.trim() || "",
+          technical_skills: techSkillsList,
+          soft_skills: softSkillsList,
+        },
+        extracted_skills: [...new Set([...techSkillsList, ...softSkillsList])],
+        file_name:
+          document.getElementById("cvFileInput")?.files[0]?.name || null,
+      };
 
-        const workExperienceValue=resumePayload.work_experience;
-        if (workExperienceValue.length<50){
-          alert("El texto de la experiencia laboral es muy corto");
-          return
-        }else{
-            const resumeResponse = await fetch(`${API_BASE_URL}/resumes`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(resumePayload),
-            });
-
-            if (!resumeResponse.ok) {
-              const errorData = await resumeResponse.json();
-              throw new Error(
-                typeof errorData.detail === "string"
-                  ? errorData.detail
-                  : "No se pudo guardar el CV.",
-              );
-            }
-            const savedResume = await resumeResponse.json();
-            resumeId = savedResume.id;
-        }
-        
-      }
-      // SI HAY TOKEN (Usuario Registrado): Omitimos guardar el CV y usamos el ID existente
-      else {
-        resumeId = extractedResumeData?.id;
-        if (!resumeId) {
-          throw new Error("No se encontró el ID del CV asociado a tu cuenta.");
-        }
+      if (resumePayload.work_experience.length < 50) {
+        await showModalAlert(
+          "Validación de CV",
+          "El texto de la experiencia laboral debe tener al menos 50 caracteres para poder calcular el matching.",
+        );
+        return;
       }
 
-      // Enviar la postulación usando el resumeId correspondiente
+      const resumeResponse = await fetch(`${API_BASE_URL}/resumes`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(resumePayload),
+      });
+
+      if (!resumeResponse.ok) {
+        const errorData = await resumeResponse.json();
+        throw new Error(
+          typeof errorData.detail === "string"
+            ? errorData.detail
+            : "No se pudo guardar el CV.",
+        );
+      }
+
+      const savedResume = await resumeResponse.json();
+      resumeId = savedResume.id;
+
       const applicationPayload = {
         resume_id: resumeId,
         candidate_email: safeCandidateEmail,
@@ -628,39 +729,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (!response.ok) {
         const errData = await response.json();
-
         let errorMessage = "Error al enviar la postulación.";
-        if (Array.isArray(errData.detail)) {
-          errorMessage = errData.detail
-            .map((err) => `${err.loc.join(".")}: ${err.msg}`)
-            .join("\n");
-        } else if (typeof errData.detail === "string") {
-          errorMessage = errData.detail;
-        }
-
+        if (typeof errData.detail === "string") errorMessage = errData.detail;
         throw new Error(errorMessage);
       }
 
+      // Ocultar modal casual antes de mostrar la invitación o éxito
+      if (applyModal) applyModal.hide();
+      showRegisterInvitationModal(candidateEmail);
+    } catch (error) {
+      // Ocultar el modal de postulación casual antes de mostrar el error
       if (applyModal) applyModal.hide();
 
-      if (!token) {
-        showRegisterInvitationModal(candidateEmail);
-      } else {
-        alert("¡Postulación enviada con éxito! La empresa revisará tu perfil.");
-      }
-    } catch (error) {
-      alert(`Error al postularte:\n${error.message}`);
+      await showModalAlert("Error al postularte", error.message);
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerHTML =
         '<i class="bi bi-send-check"></i> Enviar Postulación';
     }
   }
-  
+
   function showRegisterInvitationModal(email) {
     const fullName =
       document.getElementById("candidateFullName")?.value.trim() || "";
-
     const modalHtml = `
       <div class="modal fade" id="registerInviteModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
@@ -670,16 +761,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 <i class="bi bi-check-circle-fill display-3"></i>
               </div>
               <h4 class="fw-bold mb-2">¡Postulación Enviada con Éxito!</h4>
-              <p class="text-muted small">
-                Hemos recibido tu CV para esta vacante.
-              </p>
+              <p class="text-muted small">Hemos recibido tu CV para esta vacante.</p>
               <hr class="my-3">
               <div class="bg-light p-3 rounded mb-3 text-start">
                 <h6 class="fw-bold text-primary mb-1">
                   <i class="bi bi-stars me-1"></i> Crea tu cuenta en PluriJob
                 </h6>
                 <p class="small text-muted mb-0">
-                  Regístrate con el correo <strong>${email}</strong> para darle seguimiento en tiempo real al estado de tu postulación y consultar el desglose de tu <strong>Match %</strong>.
+                  Regístrate con el correo <strong>${email}</strong> para darle seguimiento en tiempo real al estado de tu postulación.
                 </p>
               </div>
               <div class="d-grid gap-2">

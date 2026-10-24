@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_recruiter
+from app.core.security import get_current_recruiter, get_optional_current_user
 
 from app.models.application import Application
 from app.models.job import Job
@@ -41,8 +41,20 @@ def _sync_expired_jobs(db: Session) -> None:
 def list_jobs(
     status_filter: Optional[str] = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     _sync_expired_jobs(db)
+
+    # Seguridad de visualización: Si no hay sesión o el usuario no es admin/reclutador,
+    # se fuerza el filtro de estado a 'active' para evitar exposición de borradores o plantillas.
+    is_staff = current_user is not None and getattr(current_user, "role", None) in [
+        "admin",
+        "recruiter",
+    ]
+
+    if not is_staff:
+        status_filter = "active"
+
     query = db.query(Job)
     if status_filter:
         query = query.filter(Job.status == status_filter)

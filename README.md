@@ -265,10 +265,14 @@ Y si deseas ver el nombre exacto de cada función de prueba conforme se va ejecu
 **Otras opciones** 
 - Dentro del contenedor Docker: Si no tienes un entorno de Python configurado localmente en tu máquina, puedes ejecutar las pruebas directamente dentro del contenedor en ejecución:
 ```
-docker exec -it nombreContenedor python -m pytest
+docker exec -it plurijob-api python -m pytest
 ```
-Para ejecutar `python -m pytest` desde tu máquina local, asegúrate de haber instalado previamente las dependencias ejecutando `pip install -r backend/requirements.txt` y `pip install pytest` en tu propio entorno virtual.
+Para ejecutar `python -m pytest` desde tu máquina local, asegúrate de haber instalado previamente las dependencias ejecutando `pip install -r backend/requirements.txt` en tu propio entorno virtual.
 
 ## Falta por implementar
 - Manejo de las diferentes etapas del proceso de selección: por el momento solo se ve el estatus received para el candidato, y el reclutador o admin pueden rechazar la postulación.
 - Envio de correos a los candidatos según la fase en la que se encuantra su proceso. Sin embargo, se contemplaron plantillas disponibles en la base de datos (tabla email_templates). (En el documento `MVP.md` se consideró como parte de otra etapa fuera del alcance de los avances hasta el día 16/10/2026)
+
+__
+## Notas para la evaluación:
+Hasta el 24/10/2026 1:13 am, al ejecutar las pruebas pasaron 72 de 72

@@ -1,3 +1,4 @@
+//# Dashboard del Reclutador: Gestión de Vacantes y Candidatos con Modales Globales
 import { API_BASE_URL } from "../config.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -10,9 +11,133 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 1. Verificación de autenticación
   if (!token) {
-    console.warn("No hay token de sesión. Redirigiendo a login...");
     window.location.href = "/src/pages/login.html";
     return;
+  }
+
+  // -------------------------------------------------------------
+  // SISTEMA DE MODALES GLOBALES (Reemplaza alert, confirm y prompt)
+  // -------------------------------------------------------------
+  function showModalAlert(title, message) {
+    return new Promise((resolve) => {
+      document.getElementById("globalAlertTitle").textContent = title;
+      document.getElementById("globalAlertMessage").textContent = message;
+
+      const cancelBtn = document.getElementById("globalAlertCancelBtn");
+      const confirmBtn = document.getElementById("globalAlertConfirmBtn");
+
+      cancelBtn.style.display = "none";
+      confirmBtn.textContent = "Aceptar";
+      confirmBtn.className = "btn btn-primary px-4";
+
+      const modalElement = document.getElementById("globalAlertModal");
+      const modal = new bootstrap.Modal(modalElement);
+
+      const handleHidden = () => {
+        confirmBtn.removeEventListener("click", handleHidden);
+        resolve();
+      };
+      modalElement.addEventListener("hidden.bs.modal", handleHidden, {
+        once: true,
+      });
+      modal.show();
+    });
+  }
+
+  function showModalConfirm(title, message, confirmButtonText = "Confirmar") {
+    return new Promise((resolve) => {
+      document.getElementById("globalAlertTitle").textContent = title;
+      document.getElementById("globalAlertMessage").textContent = message;
+
+      const cancelBtn = document.getElementById("globalAlertCancelBtn");
+      const confirmBtn = document.getElementById("globalAlertConfirmBtn");
+
+      cancelBtn.style.display = "block";
+      cancelBtn.textContent = "Cancelar";
+      confirmBtn.textContent = confirmButtonText;
+      confirmBtn.className = "btn btn-success px-4";
+
+      const modalElement = document.getElementById("globalAlertModal");
+      const modal = new bootstrap.Modal(modalElement);
+
+      let userConfirmed = false;
+
+      const onConfirm = () => {
+        userConfirmed = true;
+        modal.hide();
+      };
+
+      const onCancel = () => {
+        userConfirmed = false;
+        modal.hide();
+      };
+
+      confirmBtn.onclick = onConfirm;
+      cancelBtn.onclick = onCancel;
+
+      const handleHidden = () => {
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        resolve(userConfirmed);
+      };
+
+      modalElement.addEventListener("hidden.bs.modal", handleHidden, {
+        once: true,
+      });
+      modal.show();
+    });
+  }
+
+  function showModalPrompt(title, message) {
+    return new Promise((resolve) => {
+      document.getElementById("globalAlertTitle").textContent = title;
+
+      const modalBody = document.querySelector("#globalAlertModal .modal-body");
+      modalBody.innerHTML = `
+        <p class="mb-2 text-dark" style="white-space: pre-line;">${message}</p>
+        <input type="text" id="globalPromptInput" class="form-control mt-2" placeholder="Motivo opcional...">
+      `;
+
+      const cancelBtn = document.getElementById("globalAlertCancelBtn");
+      const confirmBtn = document.getElementById("globalAlertConfirmBtn");
+
+      cancelBtn.style.display = "block";
+      cancelBtn.textContent = "Cancelar";
+      confirmBtn.textContent = "Descartar Candidato";
+      confirmBtn.className = "btn btn-danger px-4";
+
+      const modalElement = document.getElementById("globalAlertModal");
+      const modal = new bootstrap.Modal(modalElement);
+
+      let inputValue = null;
+
+      const onConfirm = () => {
+        const input = document.getElementById("globalPromptInput");
+        inputValue = input ? input.value.trim() : "";
+        modal.hide();
+      };
+
+      const onCancel = () => {
+        inputValue = null;
+        modal.hide();
+      };
+
+      confirmBtn.onclick = onConfirm;
+      cancelBtn.onclick = onCancel;
+
+      const handleHidden = () => {
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        // Restaurar HTML original del body del modal por si se usa en otro lado
+        modalBody.innerHTML = `<p id="globalAlertMessage" class="mb-0 fs-6 text-dark" style="white-space: pre-line;"></p>`;
+        resolve(inputValue);
+      };
+
+      modalElement.addEventListener("hidden.bs.modal", handleHidden, {
+        once: true,
+      });
+      modal.show();
+    });
   }
 
   const createRecruiterBtn = document.getElementById("createRecruiterBtn");
@@ -23,7 +148,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (modalEl) new bootstrap.Modal(modalEl).show();
     });
 
-    // Escuchador para el botón de Crear Reclutador, disponible solo para usuario con rol Admin
     const recruiterForm = document.getElementById("createRecruiterForm");
     recruiterForm?.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -61,7 +185,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
         }
 
-        alert("Reclutador creado correctamente.");
+        await showModalAlert("Éxito", "Reclutador creado correctamente.");
         recruiterForm.reset();
         bootstrap.Modal.getInstance(
           document.getElementById("createRecruiterModal"),
@@ -71,7 +195,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           errorBox.textContent = error.message;
           errorBox.classList.remove("d-none");
         } else {
-          alert(error.message);
+          await showModalAlert("Error", error.message);
         }
       }
     });
@@ -94,13 +218,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const candidatesSortSelect = document.getElementById("candidateMatchSort");
   candidatesSortSelect?.addEventListener("change", renderCandidateCards);
   const jobSearchInput = document.getElementById("jobSearchInput");
+
   const filterJobs = () => {
     const query = (jobSearchInput?.value || "").trim().toLocaleLowerCase();
     if (!query) {
       renderJobs(currentJobs);
       return;
     }
-    // Al usar el buscador en el dashboard del reclutador, puede encontrar vacantes según coincidencias del texto en el título, descripción, area, perfil, modalidad, ubicación, habilidades
     const filteredJobs = currentJobs.filter((job) => {
       const searchableText = [
         job.title,
@@ -119,6 +243,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     renderJobs(filteredJobs);
   };
+
   document
     .getElementById("jobSearchButton")
     ?.addEventListener("click", filterJobs);
@@ -138,7 +263,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     ? new bootstrap.Modal(jobDetailModalElement)
     : null;
 
-  // Botón para regresar a las vacantes
   if (backToJobsBtn) {
     backToJobsBtn.addEventListener("click", () => {
       candidatesSection.classList.add("d-none");
@@ -162,7 +286,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (!response.ok) {
         if (response.status === 401) {
-          alert("Tu sesión ha expirado. Por favor inicia sesión de nuevo.");
+          await showModalAlert(
+            "Sesión Expirada",
+            "Tu sesión ha expirado. Por favor inicia sesión de nuevo.",
+          );
           localStorage.removeItem("access_token");
           window.location.href = "/src/pages/login.html";
           return;
@@ -190,7 +317,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Cargar vacantes en secciones Activas, Vencidas, Cerradas
   function renderJobs(jobs) {
     const activeContainer = document.getElementById("activeJobsList");
     const expiredContainer = document.getElementById("expiredJobsList");
@@ -217,7 +343,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     attachJobEventListeners();
   }
 
-  // Tarjetas con un poco de información de las vacantes
   function createJobCard(job, status) {
     const skills = job.technical_skills || job.soft_skills || [];
     const statusMap = {
@@ -231,7 +356,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const isExpired = status === "expired";
     const isClosed = status === "closed";
 
-    // Generar botones según estado
     let buttons = `
     <button class="btn btn-sm btn-outline-secondary view-job-btn" data-id="${job.id}">
       <i class="bi bi-eye"></i> Ver
@@ -272,7 +396,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         <i class="bi bi-people"></i> Candidatos
       </button>
     `;
-      // El botón de eliminar vacante cerrada solo se muestra si el rol es estrictamente admin
       if (userRole === "admin") {
         buttons += `
         <button class="btn btn-outline-danger btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="delete">
@@ -315,9 +438,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   `;
   }
 
-  // Escuchador de los botones de las tarjetas de las vacantes vistas por el reclutador
   function attachJobEventListeners() {
-    // Ver Candidatos
     document.querySelectorAll(".view-candidates-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const jobId = e.currentTarget.dataset.jobId;
@@ -333,7 +454,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-    // Ver detalle de la vacante
     document.querySelectorAll(".view-job-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const jobId = e.currentTarget.getAttribute("data-id");
@@ -341,7 +461,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-    // Cerrar / Reabrir / Eliminar Vacante
     document.querySelectorAll(".toggle-status-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const jobId = e.currentTarget.dataset.jobId;
@@ -352,13 +471,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             (item) => String(item.id) === String(jobId),
           );
           if (!job) {
-            alert("No se encontró la vacante que deseas reabrir.");
+            await showModalAlert(
+              "Aviso",
+              "No se encontró la vacante que deseas reabrir.",
+            );
             return;
           }
-
-          const mode = job.status === "expired" ? "expired" : "closed";
-          // Redirige a publish.html enviando el modo y el id de la vacante
-          window.location.href = `publish.html?mode=reopen-${mode}&id=${encodeURIComponent(job.id)}`;
+          openReopenModal(jobId);
           return;
         }
 
@@ -368,8 +487,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (action === "close") {
-          const confirmed = confirm(
+          const confirmed = await showModalConfirm(
+            "Cerrar Vacante",
             "¿Estás seguro de que quieres cerrar esta vacante?",
+            "Sí, cerrar",
           );
           if (!confirmed) return;
         }
@@ -379,15 +500,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-// Función para almacenar/archivar la vacante cerrada (Exclusivo Admin)
   async function deleteClosedJob(jobId) {
     const confirmationMessage =
       "¿Estás seguro de que deseas archivar esta vacante cerrada?\n\n" +
-      "La vacante se guardará como plantilla para futuros usos y se eliminarán de forma permanente todas sus postulaciones asociadas.";
+      "La vacante se guardará como plantilla y se eliminarán de forma permanente todas sus postulaciones asociadas.";
 
-    if (!window.confirm(confirmationMessage)) {
-      return;
-    }
+    const confirmed = await showModalConfirm(
+      "Archivar Vacante",
+      confirmationMessage,
+      "Sí, archivar",
+    );
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/jobs/${jobId}/store`, {
@@ -400,23 +523,27 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error(errData.detail || "No se pudo almacenar la vacante.");
       }
 
-      alert("Vacante almacenada correctamente y postulaciones asociadas eliminadas.");
+      await showModalAlert(
+        "Éxito",
+        "Vacante almacenada correctamente y postulaciones asociadas eliminadas.",
+      );
       await loadJobs();
     } catch (error) {
-      alert(`Error al procesar: ${error.message}`);
+      await showModalAlert("Error", `Error al procesar: ${error.message}`);
     }
   }
 
-  // Función para poblar y abrir el Modal con el detalle de la vacante
   function openJobModal(jobId) {
     const job = currentJobs.find((j) => String(j.id) === String(jobId));
 
     if (!job) {
-      alert("No se encontró información detallada de esta vacante.");
+      showModalAlert(
+        "Aviso",
+        "No se encontró información detallada de esta vacante.",
+      );
       return;
     }
 
-    // Cargar información general de la vacante
     const modalJobTitle = document.getElementById("modalJobTitle");
     if (modalJobTitle) modalJobTitle.textContent = job.title || "Sin título";
 
@@ -453,7 +580,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         : "Sin fecha límite";
     }
 
-    // --- Formatear Habilidades Técnicas ---
     const technicalSkillsContainer = document.getElementById(
       "modalTechnicalSkills",
     );
@@ -479,7 +605,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    // --- Formatear Habilidades Blandas ---
     const softSkillsContainer = document.getElementById("modalSoftSkills");
     if (softSkillsContainer) {
       softSkillsContainer.innerHTML = "";
@@ -503,7 +628,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    // Abrir el Modal de Bootstrap
     if (jobDetailModal) {
       jobDetailModal.show();
     } else {
@@ -522,17 +646,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (response.ok) {
         await loadJobs();
         if (action === "close") {
-          alert("La vacante ha sido cerrada.");
+          await showModalAlert("Éxito", "La vacante ha sido cerrada.");
         }
       } else {
-        alert("No se pudo cambiar el estado de la vacante.");
+        await showModalAlert(
+          "Error",
+          "No se pudo cambiar el estado de la vacante.",
+        );
       }
     } catch (error) {
-      alert("No se pudo cambiar el estado de la vacante.");
+      await showModalAlert(
+        "Error",
+        "No se pudo cambiar el estado de la vacante.",
+      );
     }
   }
 
-  // Carga los candidatos de la vacante
   async function loadCandidates(jobId) {
     const container = document.getElementById("candidatesList");
     if (!container) return;
@@ -577,7 +706,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 app.resume = await res.json();
               }
             } catch (e) {
-              console.error(`Error al cargar un CV`);
             }
           }
           return app;
@@ -592,7 +720,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Crea terjetas con información del análisis de matching
   function renderCandidateCards() {
     const container = document.getElementById("candidatesList");
     if (!container) return;
@@ -656,7 +783,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       : "No disponible";
   }
 
-  // Crea la tarjeta básica que presenta al candidato postulado y su CV
   function createCandidateCard(app) {
     const score = Math.round(app.match_score || 0);
     let badgeBg = "bg-danger";
@@ -785,9 +911,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
-  // Escuchadores
   function attachCandidateEventListeners() {
-    // para el botón de Ver CV del candidato postulado
     document.querySelectorAll(".view-cv-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const resumeId = e.currentTarget.dataset.resumeId;
@@ -796,7 +920,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-    // para el botón de descartar candidato
+    // Reemplazando el prompt() nativo por nuestro prompt modal estilizado
     document.querySelectorAll(".reject-candidate-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
@@ -804,8 +928,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const appId = e.currentTarget.dataset.appId;
         const jobId = e.currentTarget.dataset.jobId;
 
-        const reason = prompt(
-          "ADVERTENCIA: El descarte es PERMANENTE. Ingresa el motivo del descarte (opcional):",
+        const reason = await showModalPrompt(
+          "Descartar Candidato",
+          "ADVERTENCIA: El descarte es PERMANENTE.\nIngresa el motivo del descarte (opcional):",
         );
 
         if (reason !== null) {
@@ -815,7 +940,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Carga la información del CV del candidato
   async function loadCVDetail(resumeId) {
     const body = document.getElementById("cvDetailBody");
     if (!body) return;
@@ -873,11 +997,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Descarta al candidato
   async function rejectApplication(appId, jobId, rejectionReason = "") {
     const token = localStorage.getItem("access_token");
     if (!token) {
-      alert("Sesión no válida.");
+      await showModalAlert(
+        "Sesión no válida",
+        "Por favor inicia sesión de nuevo.",
+      );
       return;
     }
 
@@ -899,8 +1025,84 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (response.ok) {
         await loadCandidates(jobId);
       } else {
-        alert(`No se pudo descartar al candidato.`);
+        await showModalAlert("Error", "No se pudo descartar al candidato.");
       }
-    } catch (error) {}
+    } catch (error) {
+      await showModalAlert(
+        "Error",
+        "Ocurrió un error al procesar el descarte.",
+      );
+    }
+  }
+
+  // Instancia del modal de reapertura
+  const reopenModalElement = document.getElementById("reopenJobModal");
+  const reopenModal = reopenModalElement
+    ? new bootstrap.Modal(reopenModalElement)
+    : null;
+
+  function openReopenModal(jobId) {
+    const jobIdInput = document.getElementById("reopenJobId");
+    const deadlineInput = document.getElementById("reopenDeadline");
+    const errorBox = document.getElementById("reopenErrorBox");
+
+    if (jobIdInput) jobIdInput.value = jobId;
+    if (deadlineInput) deadlineInput.value = "";
+    if (errorBox) {
+      errorBox.textContent = "";
+      errorBox.classList.add("d-none");
+    }
+
+    if (reopenModal) {
+      reopenModal.show();
+    }
+  }
+
+  const confirmReopenBtn = document.getElementById("confirmReopenBtn");
+  if (confirmReopenBtn) {
+    confirmReopenBtn.addEventListener("click", async () => {
+      const jobId = document.getElementById("reopenJobId")?.value;
+      const deadlineVal = document.getElementById("reopenDeadline")?.value;
+      const errorBox = document.getElementById("reopenErrorBox");
+
+      if (errorBox) {
+        errorBox.textContent = "";
+        errorBox.classList.add("d-none");
+      }
+
+      const deadlineIso = deadlineVal
+        ? new Date(deadlineVal).toISOString()
+        : null;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/jobs/${jobId}/reopen`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            deadline: deadlineIso,
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data.detail || "No se pudo reabrir la vacante.");
+        }
+
+        if (reopenModal) reopenModal.hide();
+        await showModalAlert("Éxito", "Vacante reabierta correctamente.");
+        await loadJobs();
+      } catch (error) {
+        if (errorBox) {
+          errorBox.textContent = error.message;
+          errorBox.classList.remove("d-none");
+        } else {
+          await showModalAlert("Error", error.message);
+        }
+      }
+    });
   }
 });

@@ -23,8 +23,7 @@ def reset_database():
 def get_auth_token_for_recruiter(
     client: TestClient, email: str = "recruiter@example.com"
 ) -> str:
-    """Función auxiliar para registrar un usuario (admin/reclutador) y obtener su token JWT."""
-    # Registrar
+    """Función auxiliar para registrar un usuario y obtener su token JWT."""
     client.post(
         "/api/v1/auth/register",
         json={
@@ -33,7 +32,6 @@ def get_auth_token_for_recruiter(
             "full_name": "Reclutador Test",
         },
     )
-    # Login
     response = client.post(
         "/api/v1/auth/login",
         json={
@@ -42,6 +40,24 @@ def get_auth_token_for_recruiter(
         },
     )
     return response.json()["access_token"]
+
+
+def get_auth_token_for_admin(
+    client: TestClient, email: str = "admin@example.com"
+) -> str:
+    """Registra al primer usuario y fuerza su rol a 'admin' en la base de datos."""
+    token = get_auth_token_for_recruiter(client, email)
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            user.role = "admin"
+            db.commit()
+    finally:
+        db.close()
+
+    return token
 
 
 def test_create_job_success():
@@ -53,7 +69,6 @@ def test_create_job_success():
 
         future_deadline = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
 
-        # Mockeamos la generación de embeddings para agilizar el test de integración del endpoint
         with patch(
             "app.api.v1.endpoints.jobs.generate_embedding", return_value=[0.1] * 384
         ):
@@ -92,7 +107,6 @@ def test_list_and_filter_jobs():
         with patch(
             "app.api.v1.endpoints.jobs.generate_embedding", return_value=[0.1] * 384
         ):
-            # Crear una vacante activa
             client.post(
                 "/api/v1/jobs",
                 headers={"Authorization": f"Bearer {token}"},
@@ -108,14 +122,12 @@ def test_list_and_filter_jobs():
                 },
             )
 
-        # Listar sin filtros
         response = client.get("/api/v1/jobs")
         assert response.status_code == 200
         jobs = response.json()
         assert len(jobs) == 1
         assert jobs[0]["title"] == "Vacante Activa"
 
-        # Listar con filtro por estado
         response_filtered = client.get("/api/v1/jobs?status=active")
         assert response_filtered.status_code == 200
         assert len(response_filtered.json()) == 1
@@ -158,7 +170,6 @@ def test_close_job_success():
             )
         job_id = create_res.json()["id"]
 
-        # Cerrar la vacante
         close_res = client.patch(
             f"/api/v1/jobs/{job_id}/close",
             headers={"Authorization": f"Bearer {token}"},
@@ -166,3 +177,196 @@ def test_close_job_success():
 
         assert close_res.status_code == 200, close_res.text
         assert close_res.json()["status"] == "closed"
+
+
+def test_store_job_as_admin_success():
+    """Valida que un administrador pueda cambiar el estado de una vacante cerrada a 'stored' (200)."""
+    reset_database()
+
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_recruiter(client, "recruiter@example.com")
+
+        with patch(
+            "app.api.v1.endpoints.jobs.generate_embedding", return_value=[0.1] * 384
+        ):
+            create_res = client.post(
+                "/api/v1/jobs",
+                headers={"Authorization": f"Bearer {recruiter_token}"},
+                json={
+                    "title": "Vacante a Almacenar",
+                    "area": "IT",
+                    "profile_type": "Senior",
+                    "modality": "remoto",
+                    "description": "Descripción detallada para la vacante a almacenar.",
+                    "technical_skills": ["Python"],
+                    "soft_skills": [],
+                    "status": "active",
+                },
+            )
+        job_id = create_res.json()["id"]
+
+        client.patch(
+            f"/api/v1/jobs/{job_id}/close",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+
+        admin_token = get_auth_token_for_admin(client, "admin@example.com")
+
+        store_res = client.patch(
+            f"/api/v1/jobs/{job_id}/store",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        assert store_res.status_code == 200, store_res.text
+        assert store_res.json()["status"] == "stored"
+
+
+def test_store_job_as_recruiter_forbidden():
+    """Valida que un reclutador común no pueda almacenar una vacante (403)."""
+    reset_database()
+
+    with TestClient(app) as client:
+        # 1. Creamos un admin primero para ocupar el primer registro
+        get_auth_token_for_admin(client, "admin@example.com")
+
+        # 2. Creamos al reclutador (segundo usuario registrado, rol de reclutador real)
+        recruiter_email = "recruiter@example.com"
+        client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": recruiter_email,
+                "password": "securepassword123",
+                "full_name": "Reclutador Test",
+            },
+        )
+
+        # Forzamos su rol explícitamente a "recruiter"
+        db = SessionLocal()
+        try:
+            recruiter_user = (
+                db.query(User).filter(User.email == recruiter_email).first()
+            )
+            if recruiter_user:
+                recruiter_user.role = "recruiter"
+                db.commit()
+        finally:
+            db.close()
+
+        login_res = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": recruiter_email,
+                "password": "securepassword123",
+            },
+        )
+        recruiter_token = login_res.json()["access_token"]
+
+        with patch(
+            "app.api.v1.endpoints.jobs.generate_embedding", return_value=[0.1] * 384
+        ):
+            create_res = client.post(
+                "/api/v1/jobs",
+                headers={"Authorization": f"Bearer {recruiter_token}"},
+                json={
+                    "title": "Vacante Cerrada",
+                    "area": "IT",
+                    "profile_type": "Senior",
+                    "modality": "remoto",
+                    "description": "Descripción detallada para la prueba de permisos.",
+                    "technical_skills": ["Python"],
+                    "soft_skills": [],
+                    "status": "active",
+                },
+            )
+        job_id = create_res.json()["id"]
+
+        client.patch(
+            f"/api/v1/jobs/{job_id}/close",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+
+        # Intentar almacenar usando el token de reclutador (debe fallar con 403)
+        store_res = client.patch(
+            f"/api/v1/jobs/{job_id}/store",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+
+        assert store_res.status_code == 403
+        assert "Se requiere rol de administrador" in store_res.json()["detail"]
+
+
+def test_store_active_job_conflict():
+    """Valida que un administrador no pueda almacenar una vacante que todavía se encuentra activa (409)."""
+    reset_database()
+
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_recruiter(client, "recruiter@example.com")
+
+        with patch(
+            "app.api.v1.endpoints.jobs.generate_embedding", return_value=[0.1] * 384
+        ):
+            create_res = client.post(
+                "/api/v1/jobs",
+                headers={"Authorization": f"Bearer {recruiter_token}"},
+                json={
+                    "title": "Vacante Activa",
+                    "area": "IT",
+                    "profile_type": "Senior",
+                    "modality": "remoto",
+                    "description": "Descripción detallada para la vacante activa.",
+                    "technical_skills": ["Python"],
+                    "soft_skills": [],
+                    "status": "active",
+                },
+            )
+        job_id = create_res.json()["id"]
+
+        admin_token = get_auth_token_for_admin(client, "admin@example.com")
+
+        store_res = client.patch(
+            f"/api/v1/jobs/{job_id}/store",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        assert store_res.status_code == 409
+        assert (
+            "Solo se pueden almacenar vacantes que se encuentren en estado cerrado"
+            in store_res.json()["detail"]
+        )
+
+
+def test_list_jobs_unauthenticated_draft_forced_to_active():
+    """Valida que un usuario sin sesión que solicite un estado restringido (como draft)
+    sea limitado o forzado a ver únicamente vacantes activas."""
+    reset_database()
+
+    with TestClient(app) as client:
+        token = get_auth_token_for_recruiter(client)
+
+        # Crear una vacante en estado 'draft' (o simulando un borrador)
+        with patch(
+            "app.api.v1.endpoints.jobs.generate_embedding", return_value=[0.1] * 384
+        ):
+            client.post(
+                "/api/v1/jobs",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "title": "Borrador Interno",
+                    "area": "IT",
+                    "profile_type": "Senior",
+                    "modality": "remoto",
+                    "description": "Descripción del borrador interno de prueba.",
+                    "technical_skills": ["Python"],
+                    "soft_skills": [],
+                    "status": "draft",
+                },
+            )
+
+        # Intentar listar con ?status=draft sin enviar token de autenticación
+        response = client.get("/api/v1/jobs?status=draft")
+
+        assert response.status_code == 200
+        # Al no ser personal autorizado, el backend fuerza el filtro a 'active' o ignora el draft,
+        # por lo que no debe retornar el borrador.
+        jobs = response.json()
+        assert len(jobs) == 0

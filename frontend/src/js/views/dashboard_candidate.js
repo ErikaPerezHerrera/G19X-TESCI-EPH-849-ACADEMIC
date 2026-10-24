@@ -1,4 +1,4 @@
-//# Estado de postulación, edición de CV y barra de progreso
+//# Estado de postulación, edición de CV y barra de progreso con Modales Globales
 import { API_BASE_URL } from "../config.js";
 
 // Variable global para almacenar las postulaciones cargadas y usarlas en el modal
@@ -21,7 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1. Verificación de autenticación
   const token = localStorage.getItem("access_token");
   if (!token) {
-    console.warn("No hay token de sesión. Redirigiendo a login...");
     window.location.href = "../login.html";
     return;
   }
@@ -49,10 +48,82 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // -------------------------------------------------------------
+// SISTEMA DE MODALES GLOBALES (Reemplaza alert y confirm)
+// -------------------------------------------------------------
+function showModalAlert(title, message) {
+  return new Promise((resolve) => {
+    document.getElementById("globalAlertTitle").textContent = title;
+    document.getElementById("globalAlertMessage").textContent = message;
+
+    const cancelBtn = document.getElementById("globalAlertCancelBtn");
+    const confirmBtn = document.getElementById("globalAlertConfirmBtn");
+
+    cancelBtn.style.display = "none";
+    confirmBtn.textContent = "Aceptar";
+    confirmBtn.className = "btn btn-primary px-4";
+
+    const modalElement = document.getElementById("globalAlertModal");
+    const modal = new bootstrap.Modal(modalElement);
+
+    const handleHidden = () => {
+      confirmBtn.removeEventListener("click", handleHidden);
+      resolve();
+    };
+    modalElement.addEventListener("hidden.bs.modal", handleHidden, {
+      once: true,
+    });
+    modal.show();
+  });
+}
+
+function showModalConfirm(title, message, confirmButtonText = "Confirmar") {
+  return new Promise((resolve) => {
+    document.getElementById("globalAlertTitle").textContent = title;
+    document.getElementById("globalAlertMessage").textContent = message;
+
+    const cancelBtn = document.getElementById("globalAlertCancelBtn");
+    const confirmBtn = document.getElementById("globalAlertConfirmBtn");
+
+    cancelBtn.style.display = "block";
+    cancelBtn.textContent = "Cancelar";
+    confirmBtn.textContent = confirmButtonText;
+    confirmBtn.className = "btn btn-success px-4";
+
+    const modalElement = document.getElementById("globalAlertModal");
+    const modal = new bootstrap.Modal(modalElement);
+
+    let userConfirmed = false;
+
+    const onConfirm = () => {
+      userConfirmed = true;
+      modal.hide();
+    };
+
+    const onCancel = () => {
+      userConfirmed = false;
+      modal.hide();
+    };
+
+    confirmBtn.onclick = onConfirm;
+    cancelBtn.onclick = onCancel;
+
+    const handleHidden = () => {
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+      resolve(userConfirmed);
+    };
+
+    modalElement.addEventListener("hidden.bs.modal", handleHidden, {
+      once: true,
+    });
+    modal.show();
+  });
+}
+
+// -------------------------------------------------------------
 // Funciones del Dashboard (dashboard.html)
 // -------------------------------------------------------------
 
-// Caargar las postulaciones del usuario autenticado
 async function loadDashboardData() {
   const token = localStorage.getItem("access_token");
 
@@ -68,7 +139,6 @@ async function loadDashboardData() {
     userApplications = await response.json();
     renderApplicationsTable(userApplications);
 
-    // Cargar datos del CV del candidato para el saludo y badge
     const profileResponse = await fetch(`${API_BASE_URL}/resumes/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -94,7 +164,6 @@ async function loadDashboardData() {
       }
     }
   } catch (error) {
-    console.error("Error al cargar dashboard.");
     const tableBody = document.getElementById("applicationsTableBody");
     if (tableBody) {
       tableBody.innerHTML = `
@@ -108,42 +177,44 @@ async function loadDashboardData() {
   }
 }
 
-// Función para confirmar y eliminar/cancelar la postulación
 async function cancelApplication(applicationId) {
-    if (!window.confirm("¿Estás seguro de que deseas cancelar esta postulación? Esta acción liberará tu espacio para postularte a otra vacante.")) {
-        return;
+  const confirmed = await showModalConfirm(
+    "Cancelar Postulación",
+    "¿Estás seguro de que deseas cancelar esta postulación?\nEsta acción liberará tu espacio para postularte a otra vacante.",
+    "Sí, cancelar",
+  );
+  if (!confirmed) return;
+
+  try {
+    const token = localStorage.getItem("access_token");
+    const headers = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(
+      `${API_BASE_URL}/applications/${applicationId}`,
+      {
+        method: "DELETE",
+        headers: headers,
+      },
+    );
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.detail || "No se pudo cancelar la postulación.");
     }
 
-    try {
-        const token = localStorage.getItem("access_token");
-        const headers = {};
-        if (token) headers["Authorization"] = `Bearer ${token}`;
+    await showModalAlert("Éxito", "Postulación cancelada con éxito.");
 
-        const response = await fetch(`${API_BASE_URL}/applications/${applicationId}`, {
-            method: "DELETE",
-            headers: headers
-        });
-
-        if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.detail || "No se pudo cancelar la postulación.");
-        }
-
-        alert("Postulación cancelada con éxito.");
-        
-        // Refrescar la tabla de postulaciones del usuario si existe la función, o recargar la página
-        if (typeof loadUserApplications === "function") {
-            loadUserApplications();
-        } else {
-            location.reload();
-        }
-
-    } catch (error) {
-        alert(`Error al cancelar: ${error.message}`);
+    if (typeof loadUserApplications === "function") {
+      loadUserApplications();
+    } else {
+      location.reload();
     }
+  } catch (error) {
+    await showModalAlert("Error", `Error al cancelar: ${error.message}`);
+  }
 }
 
-// Cargar la tabla con postulaciones del candidato
 function renderApplicationsTable(apps) {
   const tableBody = document.getElementById("applicationsTableBody");
   const statApplications = document.getElementById("statApplications");
@@ -164,17 +235,14 @@ function renderApplicationsTable(apps) {
     return;
   }
 
-  // Calcular Match Promedio en base a los matchs de sus postulaciones
   const totalMatch = apps.reduce((acc, app) => acc + (app.match_score || 0), 0);
   const avgMatch = Math.round(totalMatch / apps.length);
   if (statAvgMatch) statAvgMatch.textContent = `${avgMatch}%`;
 
-  // Renderizar filas soportando el modelo Application
   tableBody.innerHTML = apps
-    .map(
-      (app) => {
-        const detailsId = `candidate-match-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
-        return `
+    .map((app) => {
+      const detailsId = `candidate-match-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
+      return `
           <tr>
             <td class="fw-bold">${escapeHtml(app.job?.title || app.job_title || "Vacante sin título")}</td>
             <td>${formatApplicationDate(app.applied_at)}</td>
@@ -215,11 +283,9 @@ function renderApplicationsTable(apps) {
             </td>
           </tr>
         `;
-      },
-    )
+    })
     .join("");
 
-  // Adjuntar event listeners a los botones "Ver"
   document.querySelectorAll(".view-job-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const appId = e.currentTarget.getAttribute("data-id");
@@ -227,7 +293,6 @@ function renderApplicationsTable(apps) {
     });
   });
 
-  // Adjuntar event listeners a los botones "Cancelar"
   document.querySelectorAll(".cancel-app-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const appId = e.currentTarget.getAttribute("data-id");
@@ -247,9 +312,8 @@ function escapeHtml(value) {
     };
     return entities[character];
   });
-  }
+}
 
-/// Formatos de los datos mostrados en la tabla del dashboard
 function formatApplicationDate(value) {
   if (!value) return "No disponible";
   const date = new Date(value);
@@ -277,7 +341,6 @@ function renderMatchSkills(values, emptyMessage) {
     .join("");
 }
 
-// Expansión que muestra al candidato información del análisis y matching
 function renderApplicationMatchDetails(app) {
   const exact = app.match_details?.exact_match || {};
   const semantic = app.match_details?.semantic_match || {};
@@ -313,19 +376,20 @@ function renderApplicationMatchDetails(app) {
   `;
 }
 
-// Función para poblar y abrir el Modal con el detalle de la vacante
 function openJobModal(applicationId) {
   const app = userApplications.find(
     (a) => String(a.id) === String(applicationId),
   );
   if (!app || !app.job) {
-    alert("No se encontró información detallada de esta vacante.");
+    showModalAlert(
+      "Aviso",
+      "No se encontró información detallada de esta vacante.",
+    );
     return;
   }
 
   const job = app.job;
 
-  // Cargar información general de la vacante
   const modalJobTitle = document.getElementById("modalJobTitle");
   if (modalJobTitle) modalJobTitle.textContent = job.title || "Sin título";
 
@@ -363,8 +427,9 @@ function openJobModal(applicationId) {
       : "Sin fecha límite";
   }
 
-  // Formatear Habilidades RTécnicas
-  const technicalSkillsContainer = document.getElementById("modalTechnicalSkills");
+  const technicalSkillsContainer = document.getElementById(
+    "modalTechnicalSkills",
+  );
   if (technicalSkillsContainer) {
     technicalSkillsContainer.innerHTML = "";
     const technicalSkills = Array.isArray(job.technical_skills)
@@ -383,7 +448,6 @@ function openJobModal(applicationId) {
     }
   }
 
-  // Formatear Habilidades Blandas
   const softSkillsContainer = document.getElementById("modalSoftSkills");
   if (softSkillsContainer) {
     softSkillsContainer.innerHTML = "";
@@ -403,7 +467,6 @@ function openJobModal(applicationId) {
     }
   }
 
-  // Instanciar y abrir el modal con el API JS de Bootstrap 5
   const modalElement = document.getElementById("jobDetailModal");
   if (modalElement) {
     const modal = new bootstrap.Modal(modalElement);
@@ -415,7 +478,6 @@ function openJobModal(applicationId) {
 // Funciones del Perfil / CV y Barra de Progreso (cv_profile.html)
 // -------------------------------------------------------------
 
-// Una barra de prograso que avanza según que campos obligatorios del CV tienen datos
 function updateProgressBar() {
   const fieldIds = [
     "fullName",
@@ -425,7 +487,7 @@ function updateProgressBar() {
     "experienceSummary",
     "techSkills",
     "softSkills",
-    "address"
+    "address",
   ];
 
   let completedFields = 0;
@@ -466,7 +528,6 @@ function setupProgressBarListeners() {
   }
 }
 
-// Carga los datos del CV que ya existe en la base de datos, relacionados al usuario autenticado
 async function loadProfileData() {
   const token = localStorage.getItem("access_token");
   if (!token) return;
@@ -501,7 +562,7 @@ async function loadProfileData() {
     setInputValue("fullName", parsed.full_name);
     setInputValue("email", data.candidate_email || parsed.email);
     setInputValue("phone", parsed.phone);
-    setInputValue("address", parsed.address||parsed.location);
+    setInputValue("address", parsed.address || parsed.location);
     setInputValue("currentTitle", parsed.professional_title);
     setInputValue("experienceSummary", parsed.work_experience);
     setInputValue("moreInfo", parsed.more_info);
@@ -526,15 +587,13 @@ async function loadProfileData() {
 
     updateProgressBar();
   } catch (error) {
-    console.error("Error al cargar la información del CV.");
   }
 }
 
-// Escuchador de los botones
 function setupProfileFormListeners() {
   const extractCvForm = document.getElementById("extractCvForm");
   const profileForm = document.getElementById("profileForm");
-  //Si se presiona el botón de Extracción de información del PDF...
+
   if (extractCvForm) {
     extractCvForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -542,7 +601,10 @@ function setupProfileFormListeners() {
       const file = fileInput?.files[0];
 
       if (!file) {
-        alert("Por favor selecciona un archivo PDF.");
+        await showModalAlert(
+          "Archivo Requerido",
+          "Por favor selecciona un archivo PDF.",
+        );
         return;
       }
 
@@ -573,7 +635,6 @@ function setupProfileFormListeners() {
         const extracted = await response.json();
         const parsed = extracted.parsed_data || {};
 
-        // Al terminar la extracción del CV del PDF con el motor de análisis NLP, ve si la IA está disponible para hacer el enriquecimiento
         const aiNotice = document.getElementById("cvAiNotice");
         if (aiNotice) {
           const aiAvailable = extracted.ai_enrichment_status === "success";
@@ -628,8 +689,7 @@ function setupProfileFormListeners() {
         }
         const softSkills = extracted.soft_skills || parsed.soft_skills;
         if (Array.isArray(softSkills)) {
-          document.getElementById("softSkills").value =
-            softSkills.join(", ");
+          document.getElementById("softSkills").value = softSkills.join(", ");
         }
         if (parsed.more_info || extracted.more_info)
           document.getElementById("moreInfo").value =
@@ -642,8 +702,7 @@ function setupProfileFormListeners() {
 
         updateProgressBar();
       } catch (err) {
-        console.error("Error al extraer PDF.");
-        alert(`Ocurrió un error al analizar el PDF.`);
+        await showModalAlert("Error", "Ocurrió un error al analizar el PDF.");
       } finally {
         if (progress) progress.classList.add("d-none");
         if (btn) btn.disabled = false;
@@ -651,8 +710,6 @@ function setupProfileFormListeners() {
     });
   }
 
-  // Si se presiona el botón para Guardar cambios... se intenta guardar la información nueva del CV relacionado al usuario registrado
-  // Desencadena el guardado de habilidades nuevas en la tabla de skills
   if (profileForm) {
     profileForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -662,9 +719,17 @@ function setupProfileFormListeners() {
 
       const existingResumeNotice =
         "Si ya tenías otro CV vinculado a tu cuenta, la información se actualizará y cualquier cambio en tu experiencia laboral o habilidades técnicas/blandas puede afectar tu visibilidad y match en procesos activos.";
-      const hasExistingResume = Boolean(profileForm.dataset.rawText || document.getElementById("resumeIdBadge"));
-      if (hasExistingResume && !window.confirm(existingResumeNotice + "\n\n¿Deseas continuar?")) {
-        return;
+      const hasExistingResume = Boolean(
+        profileForm.dataset.rawText || document.getElementById("resumeIdBadge"),
+      );
+
+      if (hasExistingResume) {
+        const confirmed = await showModalConfirm(
+          "Actualizar CV",
+          existingResumeNotice + "\n\n¿Deseas continuar?",
+          "Sí, continuar",
+        );
+        if (!confirmed) return;
       }
 
       const techSkillsStr = document.getElementById("techSkills")?.value || "";
@@ -683,16 +748,25 @@ function setupProfileFormListeners() {
       const workExperience =
         document.getElementById("experienceSummary")?.value || "";
 
+      if (workExperience.length < 50) {
+        await showModalAlert(
+          "Validación",
+          "El texto de la experiencia laboral es muy corto (mínimo 50 caracteres).",
+        );
+        return;
+      }
+
       const rawText = profileForm.dataset.rawText || workExperience;
       const enteredEmail = document.getElementById("email")?.value || "";
 
       let safeEmail = enteredEmail;
       try {
-        safeEmail = await window.PluriJobAuth.validateCandidateEmailForCurrentUser(
-          enteredEmail,
-        );
+        safeEmail =
+          await window.PluriJobAuth.validateCandidateEmailForCurrentUser(
+            enteredEmail,
+          );
       } catch (error) {
-        alert(error.message);
+        await showModalAlert("Error de validación", error.message);
         return;
       }
 
@@ -712,41 +786,33 @@ function setupProfileFormListeners() {
           more_info: document.getElementById("moreInfo")?.value || "",
         },
       };
-      
-      const workExperienceValue=payload.work_experience;
-      if(workExperienceValue<50){
-        alert("El texto de la experiencia laboral es muy corto");
-        return;
-      }else{
-        try {
-          const response = await fetch(`${API_BASE_URL}/resumes`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(payload),
-          });
 
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error("Error guardando en la base de datos");
-          }
+      try {
+        const response = await fetch(`${API_BASE_URL}/resumes`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
 
-          alert("¡Perfil guardado correctamente!");
-          updateProgressBar();
-        } catch (error) {
-          alert(`Error al guardar: ${error.message}`);
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(
+            errData.detail || "Error guardando en la base de datos",
+          );
         }
+
+        await showModalAlert("¡Éxito!", "¡Perfil guardado correctamente!");
+        updateProgressBar();
+      } catch (error) {
+        await showModalAlert("Error al guardar", error.message);
       }
-      
     });
   }
 }
 
-// -------------------------------------------------------------
-// Cierre de Sesión
-// -------------------------------------------------------------
 function handleLogout(e) {
   if (e) e.preventDefault();
   localStorage.removeItem("access_token");
