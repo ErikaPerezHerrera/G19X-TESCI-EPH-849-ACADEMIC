@@ -77,13 +77,14 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     db.refresh(user)
     return user
 
+
 ## Ruta administrativa para crear cuentas con rol recruiter
 @router.post(
     "/register/recruiter",
     response_model=UserOut,
     status_code=status.HTTP_201_CREATED,
 )
-## Para poder crear la cuanta de recruiter, el usuario que hace la petición debe ser admin y estar autenticado.
+## Para poder crear la cuenta de recruiter, el usuario que hace la petición debe ser admin y estar autenticado.
 def register_recruiter(
     payload: UserCreate,
     db: Session = Depends(get_db),
@@ -97,6 +98,13 @@ def register_recruiter(
             detail="El correo electrónico ya está registrado.",
         )
 
+    password = payload.password
+
+    if len(password) < 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña debe tener al menos 12 caracteres.",
+        )
     user = User(
         email=email,
         full_name=payload.full_name,
@@ -108,6 +116,7 @@ def register_recruiter(
     db.commit()
     db.refresh(user)
     return user
+
 
 ## Ruta de login para usuarios registrados
 @router.post("/login", response_model=Token)
