@@ -156,7 +156,7 @@
               <p class="text-muted mb-0" id="modalJobArea">-</p>
             </div>
             <div class="col-md-6">
-              <strong>Tipo de Perfil:</strong>
+              <strong>Escolaridad o Perfil:</strong>
               <p class="text-muted mb-0" id="modalProfileType">-</p>
             </div>
             <div class="col-md-6">
@@ -217,6 +217,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="cvCandidateName">Detalle del Candidato</h5>
+          <button type="button" class="btn-close" data-bs-success="modal" id="changeApplicationState"></button>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body" id="cvDetailBody">
@@ -297,32 +298,6 @@
           <div class="modal-footer bg-light border-0">
             <button type="button" class="btn btn-secondary px-4" id="globalAlertCancelBtn" data-bs-dismiss="modal" style="display: none;">Cancelar</button>
             <button type="button" class="btn btn-primary px-4" id="globalAlertConfirmBtn" data-bs-dismiss="modal">Aceptar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. Modal Simplificado para Postulación Directa de Usuarios Registrados -->
-    <div class="modal fade" id="directApplyModal" tabindex="-1" aria-labelledby="directApplyModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-          <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title fw-bold" id="directApplyModalLabel"><i class="bi bi-send-fill me-2"></i> Confirmar Postulación</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body py-4">
-            <p class="text-muted mb-2">Estás a punto de postularte a la siguiente vacante utilizando la información de tu CV registrado:</p>
-            <div class="p-3 bg-light rounded border mb-3">
-              <h6 class="fw-bold text-dark mb-1" id="directApplyJobTitle">Título de la Vacante</h6>
-              <p class="small text-muted mb-0" id="directApplyJobSubtitle">Área • Modalidad</p>
-            </div>
-            <p class="small text-secondary mb-0"><i class="bi bi-info-circle me-1"></i> Tu puntaje de compatibilidad (Match %) se calculará automáticamente al confirmar.</p>
-          </div>
-          <div class="modal-footer bg-light border-0">
-            <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" class="btn btn-primary px-4 fw-bold" id="confirmDirectApplyBtn">
-              <i class="bi bi-send-check me-1"></i> Postularme Ahora
-            </button>
           </div>
         </div>
       </div>

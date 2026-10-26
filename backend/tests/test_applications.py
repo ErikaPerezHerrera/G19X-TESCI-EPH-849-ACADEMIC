@@ -109,7 +109,7 @@ def test_create_application_success():
         data = response.json()
         assert data["job_id"] == job_id
         assert data["candidate_email"] == candidate_email
-        assert data["status"] == "received"
+        assert data["status"] == "application_received"
 
 
 def test_create_application_email_mismatch_fails():

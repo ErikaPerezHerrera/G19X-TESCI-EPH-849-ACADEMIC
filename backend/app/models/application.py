@@ -38,7 +38,7 @@ class Application(Base):
         Index("idx_applications_job_score", "job_id", "match_score"),
         # Índice para acelerar la consulta del historial de postulaciones de un candidato
         Index("idx_applications_user_applied_at", "user_id", "applied_at"),
-        # Índice para filtrar candidatos por estado dentro del tablero del reclutador (ej: 'under_review', 'shortlisted')
+        # Índice para filtrar candidatos por estado dentro del tablero del reclutador
         Index("idx_applications_job_status", "job_id", "status"),
     )
 
@@ -77,20 +77,19 @@ class Application(Base):
         JSONB, nullable=False, default=dict, server_default="{}"
     )
 
-    # Estado actual de la postulación (ej: 'received', 'under_review', 'shortlisted', 'rejected')
+    # Estado actual de la postulación
     status = Column(
         ENUM(
-            "received",
-            "under_review",
-            "shortlisted",
-            "interview_scheduled",
-            "rejected",
-            "hired",
+            'application_received',
+            'application_under_review',
+            'interview_scheduled',
+            'rejected',
+            'hired',
             name="application_status_enum",
         ),
         nullable=False,
-        default="received",
-        server_default="received",
+        default="application_received",
+        server_default="application_received",
     )
 
     # Motivo opcional registrado al descartar/rechazar una postulación

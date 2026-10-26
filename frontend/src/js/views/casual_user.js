@@ -464,12 +464,13 @@ document.addEventListener("DOMContentLoaded", () => {
         "¡Postulación enviada con éxito! La empresa revisará tu perfil.",
       );
 
-      window.location.href = "dashboard.html";
+      window.location.href = "candidate/dashboard.html";
     } catch (error) {
       // 2. IMPORTANTE: Ocultar el modal de postulación antes de mostrar el error (ej. límite de 3 alcanzado)
       if (directApplyModal) directApplyModal.hide();
+      console.log(error.message);
 
-      await showModalAlert("Límite alcanzado", error.message);
+      await showModalAlert("Error al postularte 1", error.message);
     } finally {
       confirmBtn.disabled = false;
       confirmBtn.innerHTML =
@@ -687,7 +688,7 @@ document.addEventListener("DOMContentLoaded", () => {
           document.getElementById("cvFileInput")?.files[0]?.name || null,
       };
 
-      if (resumePayload.work_experience.length < 50) {
+      if (resumePayload.work_experience< 50) {
         await showModalAlert(
           "Validación de CV",
           "El texto de la experiencia laboral debe tener al menos 50 caracteres para poder calcular el matching.",
@@ -741,7 +742,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Ocultar el modal de postulación casual antes de mostrar el error
       if (applyModal) applyModal.hide();
 
-      await showModalAlert("Error al postularte", error.message);
+      await showModalAlert("Error al postularte 2", error.message);
+      console.log(error.message);
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerHTML =

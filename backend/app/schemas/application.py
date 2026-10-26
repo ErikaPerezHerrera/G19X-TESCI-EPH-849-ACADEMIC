@@ -57,12 +57,11 @@ class ApplicationOut(BaseModel):
     resume_id: UUID
     candidate_email: str
     status: Literal[
-        "received",
-        "under_review",
-        "shortlisted",
+        "application_received",
+        "application_under_review",
         "interview_scheduled",
         "rejected",
-        "hired",
+        "hired"
     ]
     applied_at: datetime | None = None
     match_score: float | None = Field(None, ge=0, le=100)

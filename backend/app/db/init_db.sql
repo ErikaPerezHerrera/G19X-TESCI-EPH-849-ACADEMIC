@@ -46,9 +46,8 @@ CREATE TYPE user_role_enum AS ENUM ('casual', 'registered', 'recruiter', 'admin'
 CREATE TYPE job_modality_enum AS ENUM ('presencial', 'remoto', 'hibrido');
 CREATE TYPE job_status_enum AS ENUM ('draft', 'active', 'expired', 'closed', 'stored');
 CREATE TYPE application_status_enum AS ENUM (
-    'received',
-    'under_review',
-    'shortlisted',
+    'application_received',
+    'application_under_review',
     'interview_scheduled',
     'rejected',
     'hired'
@@ -135,7 +134,7 @@ CREATE TABLE applications (
     match_details JSONB NOT NULL DEFAULT '{}'::jsonb,
     is_overqualified BOOLEAN NOT NULL DEFAULT FALSE,
     ai_analysis JSONB NOT NULL DEFAULT '{}'::jsonb,
-    status application_status_enum NOT NULL DEFAULT 'received',
+    status application_status_enum NOT NULL DEFAULT 'application_received',
     rejection_reason TEXT,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -319,11 +318,11 @@ VALUES
     (
         'application_received',
         'Tu postulación fue recibida',
-        'Hola {{candidate_name}}, hemos recibido tu postulación para {{job_title}}. En breve revisaremos tu perfil y te contactaremos si avanzas en el proceso.',
+        'Hola {{candidate_name}}, hemos recibido tu postulación para {{job_title}}. Tu match es de {{match_score}}. En breve revisaremos tu perfil y te contactaremos si avanzas en el proceso.',
         TRUE
     ),
     (
-        'cv_readed',
+        'application_under_review',
         'Tu perfil fue visto',
         'Hola {{candidate_name}}, hemos visto el CV que preparaste para {{job_title}}. Te invitamos a seguir pendiente del avance de tu proceso.',
         TRUE
@@ -337,7 +336,7 @@ VALUES
     (
         'vacancy_closed',
         'Vacante cerrada',
-        'Hola {{candidate_name}}, la vacante {{job_title}} ha sido cerrada por el reclutador. Gracias por tu interés y te invitamos a seguir revisando nuevas oportunidades.',
+        'Hola {{candidate_name}}, la vacante {{job_title}} ha sido cerrada por el reclutador. Durante los próximos 30 días se eliminará esta vacante y serás libre de participar en otro proceso de selección. Hasta entonces, si el reclutador reabre la vacante seguiras siendo considerado como un candidato viable. Te informaremos que pasa con la vacante.',
         TRUE
     ),
     (
@@ -355,7 +354,7 @@ VALUES
     (
         'status_update',
         'Actualización de tu postulación',
-        'Hola, hay una actualización en el estado de tu postulación. Te informaremos los próximos pasos.',
+        'Hola, hay una actualización en el estado de tu postulación.',
         TRUE
     )
 ON CONFLICT (template_key) DO NOTHING;

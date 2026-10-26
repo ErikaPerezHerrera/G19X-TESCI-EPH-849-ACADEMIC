@@ -21,6 +21,11 @@ from app.models.user import User
 
 from app.schemas.user import Token, UserCreate, UserLogin, UserOut
 
+from app.services.email_service import (
+    validate_email_format_and_existence,
+    send_templated_email,
+)
+
 router = APIRouter(tags=["auth"])
 
 
@@ -44,6 +49,18 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     El primer usuario en resistrarse será admin; el resto se registran como candidatos.
     """
     email = payload.email.lower()
+
+    # Validar formato y existencia real del correo usando el servicio
+    email = validate_email_format_and_existence(email)
+
+    existing_user = db.query(User).filter(func.lower(User.email) == email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo electrónico ya está registrado.",
+        )
+
+    # Validar que el correo no esté registrado ya
     if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -59,9 +76,20 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
         password_hash=hash_password(payload.password),
         is_active=True,
     )
-    # Se crea el usuario, y se asocia con un CV existente si corresponde y se cambia la fecha de expiración del CV a None para que no caduque.
+
+    # Se crea el usuario
     db.add(user)
     db.flush()
+
+    # Enviar correo de bienvenida utilizando la plantilla de la BD
+    send_templated_email(
+        db,
+        to_email=user.email,
+        template_key="account_created",
+        context={"candidate_name": user.full_name or "Usuario"},
+    )
+
+    # Se asocia con un CV existente si corresponde y se cambia la fecha de expiración del CV a None para que no caduque.
     resume = (
         db.query(Resume)
         .filter(
@@ -91,7 +119,20 @@ def register_recruiter(
     current_user: User = Depends(get_current_admin),
 ):
     """Ruta administrativa para crear cuentas con rol recruiter."""
+
     email = payload.email.lower()
+
+    # Validar formato y existencia real del correo usando el servicio
+    email = validate_email_format_and_existence(email)
+
+    existing_user = db.query(User).filter(func.lower(User.email) == email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo electrónico ya está registrado.",
+        )
+    
+    # Validar que el correo no esté registrado ya
     if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

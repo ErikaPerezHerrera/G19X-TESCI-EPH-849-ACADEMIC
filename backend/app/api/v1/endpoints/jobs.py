@@ -42,7 +42,7 @@ def list_jobs(
     status_filter: Optional[str] = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_current_user),
-):
+    ):
     _sync_expired_jobs(db)
 
     # Seguridad de visualización: Si no hay sesión o el usuario no es admin/reclutador,

@@ -203,7 +203,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         alert("¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.");
-        window.location.href = "login.html";
       } catch (error) {
         errorMessage.innerText = error.message;
         errorMessage.classList.remove("d-none");

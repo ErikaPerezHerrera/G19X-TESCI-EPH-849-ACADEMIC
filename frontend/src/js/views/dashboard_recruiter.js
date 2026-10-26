@@ -705,8 +705,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               if (res.ok) {
                 app.resume = await res.json();
               }
-            } catch (e) {
-            }
+            } catch (e) {}
           }
           return app;
         }),
@@ -719,7 +718,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         '<div class="alert alert-danger">Error al cargar la lista de candidatos.</div>';
     }
   }
-
   function renderCandidateCards() {
     const container = document.getElementById("candidatesList");
     if (!container) return;
@@ -749,6 +747,106 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     container.innerHTML = applications.map(createCandidateCard).join("");
     attachCandidateEventListeners();
+  }
+
+  function attachCandidateEventListeners() {
+    // 1. Ver Detalle del CV (Dispara también la notificación automática de "CV visto" / under_review)
+    document.querySelectorAll(".view-cv-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        const resumeId = e.currentTarget.dataset.resumeId;
+        const appId = e.currentTarget.dataset.appId;
+
+        // Notificar al backend que el CV ha sido visto para cambiar estado y enviar correo si aplica
+        if (appId) {
+          try {
+            await fetch(`${API_BASE_URL}/applications/${appId}/view`, {
+              method: "PATCH",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          } catch (err) {
+            console.error("No se pudo registrar la visualización del CV", err);
+          }
+        }
+
+        await loadCVDetail(resumeId);
+        if (cvDetailModal) cvDetailModal.show();
+      });
+    });
+
+    // 2. Cambio de Estado Dinámico (Programar Entrevista -> Contratar) usando #changeApplicationState
+    document.querySelectorAll(".change-state-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const appId = e.currentTarget.dataset.appId;
+        const jobId = e.currentTarget.dataset.jobId;
+        const nextAction = e.currentTarget.dataset.nextAction; // 'interview' o 'hire'
+
+        let title = "Programar Entrevista";
+        let message =
+          "¿Estás seguro de avanzar este candidato a la etapa de entrevista? Se le notificará por correo electrónico.";
+        let confirmText = "Sí, programar";
+
+        if (nextAction === "hire") {
+          title = "Contratar Candidato";
+          message =
+            "¡Atención! Al contratar a este candidato, la vacante se cerrará en automático y se notificará a los demás postulantes. Los demás registros se mantendrán vigentes durante el periodo de prueba.\n\n¿Deseas continuar?";
+          confirmText = "Sí, contratar";
+        }
+
+        const confirmed = await showModalConfirm(title, message, confirmText);
+        if (!confirmed) return;
+
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/applications/${appId}/${nextAction}`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(
+              errData.detail ||
+                "No se pudo actualizar el estado de la postulación.",
+            );
+          }
+
+          await showModalAlert(
+            "Éxito",
+            nextAction === "hire"
+              ? "¡Candidato contratado y vacante cerrada con éxito!"
+              : "Entrevista programada y correo enviado correctamente.",
+          );
+          await loadCandidates(jobId);
+          await loadJobs(); // Refrescar vacantes por si se cerró alguna
+        } catch (error) {
+          await showModalAlert("Error", error.message);
+        }
+      });
+    });
+
+    // 3. Descartar Candidato
+    document.querySelectorAll(".reject-candidate-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const appId = e.currentTarget.dataset.appId;
+        const jobId = e.currentTarget.dataset.jobId;
+
+        const reason = await showModalPrompt(
+          "Descartar Candidato",
+          "ADVERTENCIA: El descarte es PERMANENTE.\nIngresa el motivo del descarte (opcional):",
+        );
+
+        if (reason !== null) {
+          await rejectApplication(appId, jobId, reason.trim());
+        }
+      });
+    });
   }
 
   function escapeHtml(value) {
@@ -783,14 +881,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       : "No disponible";
   }
 
+  // --- RENDERIZADO DE TARJETAS DE CANDIDATOS ---
   function createCandidateCard(app) {
     const score = Math.round(app.match_score || 0);
     let badgeBg = "bg-danger";
     if (score >= 85) badgeBg = "bg-success";
     else if (score >= 70) badgeBg = "bg-primary";
     else if (score >= 60) badgeBg = "bg-warning text-dark";
-
-    const isRejected = app.status === "rejected";
 
     const resume = app.resume || {};
     const parsed = resume.parsed_data || {};
@@ -811,13 +908,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       parsed.title ||
       parsed.titulo ||
       "Sin título especificado";
+
     const details = app.match_details || {};
     const exactMatch = details.exact_match || {};
     const semanticMatch = details.semantic_match || {};
     const aiAnalysis = app.ai_analysis || {};
     const overqualification = details.overqualification || {};
-    const detailsId = `match-details-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
-    const overqualificationId = `overqualification-${String(app.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+    const appIdStr = String(app.id);
+    const detailsId = `match-details-${appIdStr.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+    const overqualificationId = `overqualification-${appIdStr.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
     const matchPros = renderSkillList(
       aiAnalysis.pros,
       "Sin puntos fuertes disponibles.",
@@ -826,6 +927,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       aiAnalysis.cons,
       "Sin riesgos disponibles.",
     );
+
     const overqualificationRow = (label, flag, reason) => `
       <div class="mb-2">
         <strong>${label}:</strong> ${flag === "YES" ? "SÍ" : "NO"}
@@ -833,46 +935,71 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
     `;
 
-    return `
-      <div class="card border-0 shadow-sm ${isRejected ? "opacity-50 bg-light" : ""}">
-        <div class="card-body d-flex justify-content-between align-items-center">
-          <div>
-            <h6 class="fw-bold mb-1">${escapeHtml(candidateName)}</h6>
-            <p class="text-muted small mb-1">
-              <i class="bi bi-envelope"></i> ${escapeHtml(candidateEmail)} |
-              <i class="bi bi-briefcase"></i> ${escapeHtml(professionalTitle)}
-            </p>
-            <span class="badge ${badgeBg}">Match: ${score}%</span>
-            ${isRejected ? '<span class="badge bg-secondary ms-1">Descartado</span>' : ""}
-          </div>
+    // Configuración dinámica del botón de estado según el estado actual de la postulación
+    let stateBtnText = "Programar Entrevista";
+    let stateBtnClass = "btn-outline-primary";
+    let targetActionState = "interview";
 
-          <div class="d-flex flex-wrap justify-content-end gap-2">
-            <button class="btn btn-outline-info btn-sm view-cv-btn" data-resume-id="${app.resume_id}">
-              <i class="bi bi-file-earmark-person"></i> Ver CV
-            </button>
-            <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#${detailsId}" aria-expanded="false" aria-controls="${detailsId}">
-              <i class="bi bi-list-check"></i> Detalles del match
-            </button>
-            ${
-              app.is_overqualified === true
-                ? `<button class="btn btn-outline-warning btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#${overqualificationId}" aria-expanded="false" aria-controls="${overqualificationId}">
-                    <i class="bi bi-exclamation-triangle"></i> Ver sobrecalificado
-                  </button>`
-                : ""
-            }
-            ${
-              !isRejected
-                ? `
-              <button class="btn btn-outline-danger btn-sm reject-candidate-btn" data-app-id="${app.id}" data-job-id="${app.job_id}">
-                <i class="bi bi-trash"></i> Descartar
+    if (app.status === "interview_scheduled") {
+      stateBtnText = "Contratar";
+      stateBtnClass = "btn-outline-success";
+      targetActionState = "hire";
+    } else if (app.status === "hired") {
+      stateBtnText = "Contratado";
+      stateBtnClass = "btn-success disabled";
+      targetActionState = "none";
+    }
+
+    return `
+      <div class="card mb-3 shadow-sm border-0">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-md-4">
+              <h5 class="mb-1 text-dark fw-bold">${escapeHtml(candidateName)}</h5>
+              <p class="text-muted small mb-1"><i class="bi bi-briefcase me-1"></i>${escapeHtml(professionalTitle)}</p>
+              <p class="text-muted small mb-0"><i class="bi bi-envelope me-1"></i>${escapeHtml(candidateEmail)}</p>
+            </div>
+            <div class="col-md-3 text-center">
+              <span class="badge ${badgeBg} fs-6 px-3 py-2">Match: ${score}%</span>
+              <div class="small text-muted mt-1">Estado: <strong>${escapeHtml(app.status)}</strong></div>
+            </div>
+            <div class="col-md-5 text-md-end mt-3 mt-md-0">
+              <!-- Botón Detalles del Match -->
+              <button class="btn btn-sm btn-outline-info me-1" type="button" data-bs-toggle="collapse" data-bs-target="#${detailsId}" aria-expanded="false" aria-controls="${detailsId}">
+                <i class="bi bi-info-circle"></i> Detalles
               </button>
-            `
-                : ""
-            }
+
+              <!-- Botón condicional de Sobrecalificación (Sólo aparece si app.is_overqualified es true) -->
+              ${
+                app.is_overqualified === true
+                  ? `<button class="btn btn-sm btn-outline-warning me-1" type="button" data-bs-toggle="collapse" data-bs-target="#${overqualificationId}" aria-expanded="false" aria-controls="${overqualificationId}">
+                       <i class="bi bi-exclamation-triangle"></i> Sobrecalificado
+                     </button>`
+                  : ""
+              }
+
+              <button class="btn btn-sm btn-outline-secondary view-cv-btn me-1" data-resume-id="${resume.id || app.resume_id}" data-app-id="${app.id}">
+                <i class="bi bi-file-earmark-text"></i> Ver CV
+              </button>
+
+              ${
+                targetActionState !== "none"
+                  ? `<button class="btn btn-sm ${stateBtnClass} change-state-btn me-1" id="changeApplicationState" data-app-id="${app.id}" data-job-id="${app.job_id}" data-next-action="${targetActionState}">
+                       <i class="bi bi-check2-circle"></i> ${stateBtnText}
+                     </button>`
+                  : `<button class="btn btn-sm btn-success me-1 disabled"><i class="bi bi-check-all"></i> Contratado</button>`
+              }
+
+              <button class="btn btn-sm btn-outline-danger reject-candidate-btn" data-app-id="${app.id}" data-job-id="${app.job_id}">
+                <i class="bi bi-x-circle"></i> Descartar
+              </button>
+            </div>
           </div>
         </div>
+
+        <!-- Panel Colapsable de Detalles del Match -->
         <div class="collapse border-top" id="${detailsId}">
-          <div class="card-body">
+          <div class="card-body bg-light">
             <div class="row g-3">
               <div class="col-md-6">
                 <h6>Coincidencia exacta: ${formatMatchScore(exactMatch.score)}</h6>
@@ -895,49 +1022,22 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
           </div>
         </div>
+
+        <!-- Panel Colapsable de Sobrecalificación -->
         ${
           app.is_overqualified === true
-            ? `<div class="collapse border-top" id="${overqualificationId}">
-                <div class="card-body">
-                  <h6 class="fw-bold">Señales de sobrecalificación</h6>
-                  ${overqualificationRow("Análisis de IA", overqualification.over_ia_analysis, overqualification.details?.ia_reason)}
-                  ${overqualificationRow("Tipo de perfil", overqualification.over_profile_type, overqualification.details?.profile_reason)}
-                  ${overqualificationRow("Habilidades técnicas", overqualification.over_technical_skills, overqualification.details?.technical_reason)}
-                </div>
-              </div>`
+            ? `<div class="collapse border-top bg-warning-subtle" id="${overqualificationId}">
+                 <div class="card-body">
+                   <h6 class="fw-bold text-dark mb-3"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Señales de sobrecalificación detectadas</h6>
+                   ${overqualificationRow("Análisis de IA", overqualification.over_ia_analysis, overqualification.details?.ia_reason)}
+                   ${overqualificationRow("Tipo de perfil", overqualification.over_profile_type, overqualification.details?.profile_reason)}
+                   ${overqualificationRow("Habilidades técnicas", overqualification.over_technical_skills, overqualification.details?.technical_reason)}
+                 </div>
+               </div>`
             : ""
         }
       </div>
     `;
-  }
-
-  function attachCandidateEventListeners() {
-    document.querySelectorAll(".view-cv-btn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        const resumeId = e.currentTarget.dataset.resumeId;
-        await loadCVDetail(resumeId);
-        if (cvDetailModal) cvDetailModal.show();
-      });
-    });
-
-    // Reemplazando el prompt() nativo por nuestro prompt modal estilizado
-    document.querySelectorAll(".reject-candidate-btn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.preventDefault();
-
-        const appId = e.currentTarget.dataset.appId;
-        const jobId = e.currentTarget.dataset.jobId;
-
-        const reason = await showModalPrompt(
-          "Descartar Candidato",
-          "ADVERTENCIA: El descarte es PERMANENTE.\nIngresa el motivo del descarte (opcional):",
-        );
-
-        if (reason !== null) {
-          await rejectApplication(appId, jobId, reason.trim());
-        }
-      });
-    });
   }
 
   async function loadCVDetail(resumeId) {
@@ -955,7 +1055,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!response.ok) throw new Error("Error al consultar el CV");
 
       const resume = await response.json();
-
       const parsed = resume.parsed_data || {};
       const techSkills =
         resume.extracted_skills ||
@@ -978,18 +1077,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       body.innerHTML = `
-        <h6><strong>Título Profesional:</strong> ${parsed.professional_title || "N/A"}</h6>
-        <p><strong>Domicilio:</strong> ${parsed.address || "N/A"} | <strong>Teléfono:</strong> ${parsed.phone || "N/A"}</p>
+        <h6><strong>Título Profesional:</strong> ${escapeHtml(parsed.professional_title || "N/A")}</h6>
+        <p><strong>Domicilio:</strong> ${escapeHtml(parsed.address || "N/A")} | <strong>Teléfono:</strong> ${escapeHtml(parsed.phone || "N/A")}</p>
         <hr>
         <h6><strong>Habilidades Técnicas:</strong></h6>
-        <p>${formattedTech || "Sin especificar"}</p>
+        <p>${escapeHtml(formattedTech || "Sin especificar")}</p>
         <h6><strong>Habilidades Blandas:</strong></h6>
-        <p>${formattedSoft || "Sin especificar"}</p>
+        <p>${escapeHtml(formattedSoft || "Sin especificar")}</p>
         <hr>
         <h6><strong>Experiencia Laboral:</strong></h6>
-        <p style="white-space: pre-line;">${parsed.work_experience || parsed.summary || "Sin experiencia registrada."}</p>
+        <p style="white-space: pre-line;">${escapeHtml(parsed.work_experience || parsed.summary || "Sin experiencia registrada.")}</p>
         <h6><strong>Más información</strong></h6>
-        <p style="white-space: pre-line;">${parsed.more_info || "Sin información adicional."}</p>
+        <p style="white-space: pre-line;">${escapeHtml(parsed.more_info || "Sin información adicional.")}</p>
       `;
     } catch (error) {
       body.innerHTML =
@@ -1023,9 +1122,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
 
       if (response.ok) {
+        await showModalAlert(
+          "Descartado",
+          "El candidato ha sido descartado y notificado.",
+        );
         await loadCandidates(jobId);
       } else {
-        await showModalAlert("Error", "No se pudo descartar al candidato.");
+        const errData = await response.json().catch(() => ({}));
+        await showModalAlert(
+          "Error",
+          errData.detail || "No se pudo descartar al candidato.",
+        );
       }
     } catch (error) {
       await showModalAlert(
@@ -1053,9 +1160,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       errorBox.classList.add("d-none");
     }
 
-    if (reopenModal) {
-      reopenModal.show();
-    }
+    if (reopenModal) reopenModal.show();
   }
 
   const confirmReopenBtn = document.getElementById("confirmReopenBtn");
@@ -1081,9 +1186,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            deadline: deadlineIso,
-          }),
+          body: JSON.stringify({ deadline: deadlineIso }),
         });
 
         const data = await response.json().catch(() => ({}));
