@@ -297,7 +297,7 @@ def extract_unclassified_info(
     address: str,
     skills: list,
     work_experience: list,
-) -> str:
+    ) -> str:
     """
     Filtra del texto original los datos clasificados y remueve etiquetas de anonimización residuales.
     """

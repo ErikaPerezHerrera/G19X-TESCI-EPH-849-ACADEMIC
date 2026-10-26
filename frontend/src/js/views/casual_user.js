@@ -468,9 +468,9 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       // 2. IMPORTANTE: Ocultar el modal de postulación antes de mostrar el error (ej. límite de 3 alcanzado)
       if (directApplyModal) directApplyModal.hide();
-      console.log(error.message);
 
-      await showModalAlert("Error al postularte 1", error.message);
+
+      await showModalAlert("Error al postularte", error.message);
     } finally {
       confirmBtn.disabled = false;
       confirmBtn.innerHTML =
@@ -742,8 +742,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Ocultar el modal de postulación casual antes de mostrar el error
       if (applyModal) applyModal.hide();
 
-      await showModalAlert("Error al postularte 2", error.message);
-      console.log(error.message);
+      await showModalAlert("Error al postularte", error.message);
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerHTML =

@@ -403,7 +403,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (isClosed) {
-      console.log("Job cerrado:", job.title, "Updated at:", job.updated_at);
       buttons += `
       <button class="btn btn-outline-success btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="reopen">
         <i class="bi bi-arrow-counterclockwise"></i> Reabrir

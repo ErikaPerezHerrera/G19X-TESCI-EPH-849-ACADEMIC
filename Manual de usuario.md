@@ -86,6 +86,8 @@ Cualquier intento de acceso invalidado a páginas protegidas mediante la edició
 El token JWT tiene una duración de 8 horas.
 
 **Advertencia**: la empresa debe realizar el primer registro inicial inmediatamente al desplegar el sistema por primera vez, para evitar que cualquier usuario externo tome accidentalmente el rol de Administrador si la plataforma se expone públicamente sin protección previa.
+
+**Nota**: Al registrarse un Usuario Registrado, se envía un correo notificatorio.
 ___
 
 ## Funciones de Usuarios Casual Y Registrado
@@ -131,14 +133,14 @@ Si realizó cambios en la información del formulario (ya sea que sea creación 
 
 #### Postulación en "Buscar Vacantes"/`index.html` (Usuario Registrado):
 
-1. Da click sobre el botón **"Postularme"** (sobre una vacante). Se llenará automaticamente un formulario con los datos del CV guardado. Estos datos no se pueden editar.
-2. Da click en **"Enviar postulación"**.
+1. Da click sobre el botón **"Postularme"** (sobre una vacante).
 
-3. Da click en **"Enviar postulación"**. Aparecerá una advertencia que informa que si ya habia una postulación asociada al mismo correo ingresado podría afectar su visibilidad en dichas postulaciones. Puede elegir entre continuar o cancelar la postulación.
+2. Aparecerá una advertencia que informa que si ya habia una postulación asociada al mismo correo ingresado podría afectar su visibilidad en dichas postulaciones. Puede elegir entre continuar o cancelar la postulación. Si da click en **"Continuar"**, el sistema se tardará un poco en mostrar un mensaje que confirme el guardado exitoso del CV o un error en el proceso de guardado. El retraso para mostrar la alerta se debe al proceso de comprobación y guardado de habilidades técnicas y blandas, y el cálculo de matching en las postulaciones relacionadas con el correo del usuario.
 
-4. Si da click en **"Continuar"**, el sistema se tardará un poco en mostrar un mensaje que confirme el guardado exitoso del CV o un error en el proceso de guardado. El retraso para mostrar la alerta se debe al proceso de comprobación y guardado de habilidades técnicas y blandas, y el cálculo de matching en las postulaciones relacionadas con el correo del usuario.
+__
 
-**Nota:** el CV asociado a un correo de un usuario casual tiene una vigencia de 12 meses. Luego de ese tiempo se elimina de la base de datos. Si en algún momento se registra un usuario con el correo asociado a ese CV, se elimina la fecha de vencimiento. Todos los candidatos tienen un máximo de 3 postulaciones, por lo que si se intenta tener una cuarta esta no se podrá realizar.
+**Nota:** el CV asociado a un correo de un usuario casual tiene una vigencia de 12 meses. Luego de ese tiempo se elimina de la base de datos. Si en algún momento se registra un usuario con el correo asociado a ese CV, se elimina la fecha de vencimiento. Todos los candidatos tienen un máximo de 3 postulaciones, por lo que si se intenta tener una cuarta esta no se podrá realizar. Al crearse una postulación, se envía un correo notificatorio que incluye el porcentaje del match obtenido al postularse.
+
 ___
 
 ### Consultar CV guardado
@@ -183,13 +185,13 @@ Si se carga la tabla de las postulaciones se puede ver que esta consta de cinco 
 - **Match %**: muestra el porcentaje total de match calculado al crear la postulación.
 - **Estado**: muestra el estado de la postulación (recibida, bajo revisión, preseleciconado, entrevista programada, rechazada, contratado). (Todavía no se usan los estados más que recibida y rechazada).
 - **Acciones**: 
-    - Ver Vacante: Un botón que al pulsarlo muestra toda la información de la vacante.
+    - Ver Vacante: Un botón que al pulsarlo muestra toda la información de la vacante. 
     - Detalles del Match: Despliega una sección informativa que muestra el puntaje de coincidencia exacta, el puntaje de coincidencia semántica y el análisis hecho por la IA (si es que se pudo conectar al servicio de IA al realizar la postulación), incluyendo su opinión y un juicio de fortalezas y debilidades encontrados en el candidato a la postulación.
     - Cancelar Postulación.
 En esta tabla se mostrarán máximo 3 postulaciones.
 ___
 ### Cancelar postulación
-Sólo los Usuarios Registrados pueden hacer esto. Se puede realizar desde la página dashboard.html, en la tabla de postulaciones. En dicha tabla se encuentra la columna "Acciones", donde se encuentra el botón **"Cancelar"**. Al hacer click sobre este le preguntará si realmente quiere elimininar su postulación a la vacante. Si acepta, se eliminará su postulación y dispondrá de una ranura más para postularse a la vacante de su preferencia.
+Sólo los Usuarios Registrados pueden hacer esto. Se puede realizar desde la página dashboard.html, en la tabla de postulaciones. En dicha tabla se encuentra la columna "Acciones", donde se encuentra el botón **"Cancelar"**. Al hacer click sobre este le preguntará si realmente quiere elimininar su postulación a la vacante. Si acepta, se eliminará su postulación y dispondrá de una ranura más para postularse a la vacante de su preferencia. Se enviará un correo notificando al usuario su acción.
 
 ___
 ## Funciones de Administrador y Reclutador
@@ -219,23 +221,34 @@ Este buscador es sensible al selector de estado de vacantes. Por ejemplo, si se 
 ___
 ### Administración de Candidatos
 Al pulsar el botón "Candidatos" se abre una lista de candidatos postulados a la vacante. Además sobre cada postulación se muestran tres botones:
-- **Ver CV**: Despliega la información del CV del candidato postulado.
+- **Ver CV**: Despliega la información del CV del candidato postulado. Provoca que se envíe un correo al candidato acerca de que su CV ha sido visto y el cambio de estado de su postulación (postulación recibida--->postulación bajo revisión).
 - **Detalles del Match**: Despliega una sección informativa que muestra el puntaje de coincidencia exacta, el puntaje de coincidencia semántica y el análisis hecho por la IA (si es que se pudo conectar al servicio de IA al realizar la postulación), incluyendo su opinión y un juicio de fortalezas y debilidades encontrados en el candidato a la postulación.
+- **Botón cambiante Programar Entrevista/Contratar**.
 - **Descartar**: Permite al Reclutador o Administrador eliminar una postulación.
 - ***Ver Sobrecalificado**: Este botón solo se muestra si se detectó que el candidato está sobrecalificado para la vacante. Despliega las razones sobre los cuales se basó el sistema para hacer tal declaración.*
 
 Además se puede ver un botón de filtro que permite ordenar a los candidatos por Match total, Coincidencia exacta, Coincidencia semántica, Otras Habilidades. Todos los filtros se aplican de mayor a menor, a excepción del "Otras Habilidades", el cual muestra a los candidatos ordenados por match total, invertidos.
+
+__
+### Programar entrevista
+Cuando el texto del botón cambiante indica "Programar entrevista", al pulsarlo muestra un mensaje que busca la confirmación. Si acepta, se enviará un correo al candidato para decirle que tiene que estar pendiente porque alguien se comunicará con él para programar la entrevista. El estado de la postulación pasa a "entrevista programada".
+
+**Atención**: El reclutador se tiene que poner en contacto directamente con el candidato para agendar la entrevista. Para obtener información de contacto revise el CV del candidato.
+
+__
+### Contratar
+Si el botón dice "Contratar" se lanzará un mensaje buscando confirmación. Si acepta, la vacante se cerrará y comenzará el periodo de prueba para el candidato cuya postulación paso a estado "contratado". No se borra ninguna postulación. Se envía un mensaje notificatorio al candidato contratado, y otro a los demás candidatos postulados informando que en un lapso de 30 días o menos su postulación será eliminada y podrán participar en otro proceso de selección.
 ___
 ### Descartar candidato
-Se trata de la eliminación directa de la postulación del candidato. Siguiendo con la Administración de Candidatos, al pulsar sobre el botón **Descartar** se muestra un mensaje que pide una razón de descarte (opcional) y la confirmación. Si se acepta, la postulación del candidato será eliminada permanentemente y el candidato dispondrá de una ranura más para hacer postulaciones.
+Se trata de la eliminación directa de la postulación del candidato. Siguiendo con la Administración de Candidatos, al pulsar sobre el botón **Descartar** se muestra un mensaje que pide una razón de descarte (opcional) y la confirmación. Si se acepta, la postulación del candidato será eliminada permanentemente y el candidato dispondrá de una ranura más para hacer postulaciones. Se enviará al candidato un correo notificatorio con o sin el motivo del descarte.
 
 ___
 ### Reabrir vacante
-Al pulsar el botón **"Reabrir"** sobre una vacante, todos los datos de la vacante serán mostrados en el formulario de "Publicar vacante"/`publish.html`. En este caso no se podrá editar la información de la vacante, sólo se permite seleccionar una fecha de vencimiento (opcional). Al presionar el botón **"Guardar y Reabrir"** la vacante cambia su estado a Activa y ahora puede verse en el selector de vacantes activas y en el panel de búsqueda de vacantes al que Usuario Casual y Usuario Registrado pueden acceder.
+Al pulsar el botón **"Reabrir"** sobre una vacante, todos los datos de la vacante serán mostrados en el formulario de "Publicar vacante"/`publish.html`. En este caso no se podrá editar la información de la vacante, sólo se permite seleccionar una fecha de vencimiento (opcional). Al presionar el botón **"Guardar y Reabrir"** la vacante cambia su estado a Activa y ahora puede verse en el selector de vacantes activas y en el panel de búsqueda de vacantes al que Usuario Casual y Usuario Registrado pueden acceder. Se enviará un correo notificatorio a los candidatos para que estén pendientes de su proceso de selección.
 
 ____
 ### Cerrar Vacante
-Si se pulsa el botón **"Cerrar"** sobre una vacante abierta/vencida se pide una confirmación. Al aceptar, el estado de la vacante pasará a "Cerrada" y podrá visualizarse desde la sección de vacantes cerradas.
+Si se pulsa el botón **"Cerrar"** sobre una vacante abierta/vencida se pide una confirmación. Al aceptar, el estado de la vacante pasará a "Cerrada" y podrá visualizarse desde la sección de vacantes cerradas. Se enviará un correo notificatorio a los usuarios, informando que en 30 días o menos su postulación será eliminada.
 
 ___
 ### Publicar Vacante
@@ -255,9 +268,15 @@ El Administrador, al igual que el Reclutador, tiene acceso a "Vacantes y "Public
 En la parte superior de la página se encuentra el botón **"Crear Reclutador"**. Al dar click en él se despliega un pequeño formulario donde el administrador ingresa los datos para crear el usuario del reclutador. Al dar click en **"Guardar Reclutador"** se guarda el usuario creado y se le asigna el rol Reclutador.
 
 ### Archivar Vacantes cerradas
-Al ver las vacantes cerradas, el administrador puede encontrar sobre las tarjetas de vacantes el botón **"Archivar"**. Al dar click se pide la confirmación para archivar la vacante y eliminar todas las postulaciones relacionadas a la vacante. Si acepta, la vacante ya no podrá ser vista en "Vacantes"/`jobs.html`.
+Al ver las vacantes cerradas, el administrador puede encontrar sobre las tarjetas de vacantes el botón **"Archivar"**. Al dar click se pide la confirmación para archivar la vacante y eliminar todas las postulaciones relacionadas a la vacante. Si acepta, la vacante ya no podrá ser vista en "Vacantes"/`jobs.html`. Al archivar la vacantes se envía un correo notificatorio a los candidatos avisando que su postulación fue eliminada y disponen de una ranura más para empezar otro proceso de selección.
 
 Sin embargo, los datos de la vacante pueden ser vistos desde "Crear Vacante"/`publish.html` mediante la función **"Reutilizar plantilla"**.
+
+____
+
+## Otras funciones
+* **Archivado automático**: Si una vacante cerrada no es archivada, a los 30 días de ser cerrada se cambia el estado a "stored" (archivada) y se eliminan las postulaciones. Se usa un plazo de 30 días a partir de la asignacion de estado "cerrada" para que si al administrador o reclutador se les olvida archivarla los candidatos puedan participar nuevamente en procesos de selección. Mientras tanto esos 30 días sirven como periodo de prueba en caso que se haya contratado un candidato. Si se reabre la vacante, los candidatos siguen enlistados y listos para continuar con su proceso.
+* **Chequeo de vencimiento**: Se comprueba que las vacantes con fecha límite no estén vencidas. En ese caso, su estado pasa a "expired" (vencida). Pueden reabrirse, y no es el mismo estado que "closed" (cerrada) o "stored" (archivada).
 
 ____
 ## Preguntas Frecuentes (FAQ) y Soporte
@@ -265,7 +284,7 @@ ____
 - **¿La interfaz es responsiva (se ajusta a todos los tamaños de página)?** 
     **Respuesta**: Si.
 - **¿El sistema cuenta con envío de correos notificatorios sobre el estado de la postulación?** 
-    **Respuesta**: No, a fecha del 23/10/2026
+    **Respuesta**: No, solo simulación de estos. Fecha del 26/10/2026
 - **¿Cómo puedo ver el resultado de mis postulaciones?** 
     **Respuesta**: Para ver el resultado de tus postulaciones debes registrarte en el sistema para poder acceder a la tabla de postulaciones que realizaste. Ahí mismo encontrarás el análisis.
 - **¿Puedo subir más de un CV?** 
@@ -282,3 +301,6 @@ ____
 
 #### Problemas con publicación de vacantes
 - El texto de la descripción del trabajo debe tener mínimo 70 caracteres para guardarse. Esto se debe a que debe haber algo de información con la que se pueda hacer el cálculo del match.
+
+## Notas finales
+Hasta el 26/10/2026 el sistema simula el envio de los correos. Si usted quisiera notificar a los candidatos sobre el estado de sus postulaciones o las vacantes, debe comunicarse directamente con él por otros medios. Aún así se recomienda al reclutador usar los botones que ofrece el sistema para ejecutar un ciclo de vida correcto de las vacantes y postulaciones.

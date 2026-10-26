@@ -16,6 +16,7 @@ from app.models.user import User
 from app.schemas.job import JobCreate, JobDraftRequest, JobOut, JobReopen
 
 from app.services.autostore_job import auto_archive_expired_closed_jobs
+from app.services.email_service import send_templated_email
 from app.services.gemini_service import generate_job_draft_with_status
 from app.services.skill_cache_service import ensure_skills_cached
 from app.services.vector_service import (
@@ -154,17 +155,13 @@ def create_job(
     return job
 
 
-from app.models.application import Application
-from app.services.email_service import send_templated_email
-
-
 ## Ruta para cerrar una vacante
 @router.patch("/{job_id}/close", response_model=JobOut)
 def close_job(
     job_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-):
+    ):
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
@@ -187,6 +184,7 @@ def close_job(
         )
 
     return job
+
 
 ## Ruta para reabrir una vacante cerrada o vencida
 @router.patch("/{job_id}/reopen", response_model=JobOut)
@@ -234,6 +232,29 @@ def reopen_job(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se pudo reabrir la vacante.",
         ) from exc
+
+    # ==========================================
+    # Notificar por correo a los candidatos postulados
+    # ==========================================
+    from app.services.email_service import send_templated_email
+    from app.models.application import Application
+
+    applications = db.query(Application).filter(Application.job_id == job.id).all()
+    for app_item in applications:
+        if app_item.candidate_email:
+            context = {
+                "candidate_name": "Candidato/a",
+                "job_title": job.title,
+                "message": "La vacante a la que te habías postulado ha sido reabierta. Tu proceso continúa activo.",
+                "default_subject": f"Vacante Reabierta: {job.title}",
+                "default_body": f"Hola, te informamos que la vacante '{job.title}' ha sido reabierta.",
+            }
+            send_templated_email(
+                db=db,
+                to_email=app_item.candidate_email,
+                template_key="status_update",
+                context=context,
+            )
 
     return job
 

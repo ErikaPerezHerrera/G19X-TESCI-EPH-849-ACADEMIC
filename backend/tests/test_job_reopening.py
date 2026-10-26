@@ -20,10 +20,17 @@ class FakeQuery:
         return self
 
     def first(self):
+        # Si la consulta es para una plantilla de correo, devolvemos un objeto con subject y body_text
+        if isinstance(self.value, str) or getattr(self, "is_template_query", False):
+            return SimpleNamespace(
+                template_key="status_update",
+                subject="Actualización de vacante: {{job_title}}",
+                body_text="Hola {{candidate_name}}, la vacante {{job_title}} ha sido actualizada. {{message}}",
+            )
         return self.value
 
     def all(self):
-        return []
+        return [SimpleNamespace(candidate_email="candidato_prueba@example.com")]
 
     def delete(self, synchronize_session=False):
         return 0
@@ -35,7 +42,14 @@ class FakeDatabase:
         self.committed = False
         self.rolled_back = False
 
-    def query(self, _model):
+    def query(self, model):
+        # Verificamos si están consultando EmailTemplate
+        from app.models.email_template import EmailTemplate
+
+        if model == EmailTemplate:
+            query_obj = FakeQuery(None)
+            query_obj.is_template_query = True
+            return query_obj
         return FakeQuery(self.job)
 
     def commit(self):
@@ -195,3 +209,40 @@ def test_reopening_job_with_null_deadline(monkeypatch):
     assert result.status == "active"
     assert result.deadline is None
     assert db.committed
+
+
+def test_reopening_job_triggers_email_notification(monkeypatch):
+    """Valida que al reabrir una vacante se invoque el servicio de envío de correos a los postulantes."""
+    job = make_job("closed")
+    db = FakeDatabase(job)
+
+    monkeypatch.setattr(jobs, "ensure_skills_cached", lambda *_args: None)
+
+    email_sent_mock = []
+
+    def mock_send_templated_email(db, to_email, template_key, context):
+        email_sent_mock.append(
+            {"to": to_email, "template": template_key, "context": context}
+        )
+        return True
+
+    # Interceptamos la función de envío de correos en el módulo donde se utiliza
+    monkeypatch.setattr(
+        "app.services.email_service.send_templated_email", mock_send_templated_email
+    )
+
+    deadline = datetime.now(timezone.utc) + timedelta(days=10)
+
+    result = jobs.reopen_job(
+        str(job.id),
+        JobReopen(deadline=deadline),
+        db,
+        SimpleNamespace(id="different-recruiter-id", role="recruiter"),
+    )
+
+    assert result.status == "active"
+    assert db.committed
+    # Validamos que se haya intentado notificar al candidato simulado usando la plantilla correcta
+    assert len(email_sent_mock) == 1
+    assert email_sent_mock[0]["to"] == "candidato_prueba@example.com"
+    assert email_sent_mock[0]["template"] == "status_update"

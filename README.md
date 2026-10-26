@@ -113,6 +113,8 @@ plurijob/
 │   │   │   └── users.py
 │   │   │
 │   │   ├── services/              # Lógica de los motores y algoritmos e IA.
+│   │   │   ├── autostore_job.py		 # Automatización de archivo de vacantes.
+│   │   │   ├── email_service.py		 # Simulación de envio de correos.
 │   │   │   ├── gemini_service.py		 # Cliente API Gemini (System Prompt).
 │   │   │   ├── markdown_parser.py		 # Conversión y limpieza del PDF a Markdown.
 │   │   │   ├── matching_engine.py		 # Algoritmo de calculo de match.
@@ -129,6 +131,7 @@ plurijob/
 │   │   ├── conftest.py
 │   │   ├── test_applications.py
 │   │   ├── test_auth.py
+│   │   ├── test_email_service.py
 │   │   ├── test_job_draft.py
 │   │   ├── test_job_reopening.py
 │   │   ├── test_job_skill_extraction.py
@@ -270,9 +273,10 @@ docker exec -it plurijob-api python -m pytest
 Para ejecutar `python -m pytest` desde tu máquina local, asegúrate de haber instalado previamente las dependencias ejecutando `pip install -r backend/requirements.txt` en tu propio entorno virtual.
 
 ## Falta por implementar
-- Manejo de las diferentes etapas del proceso de selección: por el momento solo se ve el estatus _application_received para el candidato, y el reclutador o admin pueden rechazar la postulación.
-- Envio de correos a los candidatos según la fase en la que se encuantra su proceso. Sin embargo, se contemplaron plantillas disponibles en la base de datos (tabla email_templates). (En el documento `MVP.md` se consideró como parte de otra etapa fuera del alcance de los avances hasta el día 16/10/2026)
+- Envio de correos reales a los candidatos
 
 __
 ## Notas para la evaluación:
-Hasta el 24/10/2026 1:13 am, al ejecutar las pruebas pasaron 72 de 72
+- Hasta el 26/10/2026 1:30 am, al ejecutar las pruebas pasaron 78 de 78 sin errores
+- El sistema hasta el momento simula el envio de correos a los candidatos de acuerdo al estado de la vacante en la que participan y el estado de su propia postulación. 
+- En los archivos subidos a plataforma se incluye una carpeta .zip con captura de pantalla de la interfaz de usuario sometida a revisión de los diferentes elementos y funciones de la página. Puede verse el uso de IA para las funciones para las que fue implementada, y pueden verse las capturas de las simulaciones de envio de correo en diferentes funciones del sistema.
