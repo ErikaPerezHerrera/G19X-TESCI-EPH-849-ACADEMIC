@@ -24,6 +24,7 @@ Administra vacantes. El rol se le otorga cuando un usuario Administrador lo da d
 - Revisar candidatos con habilidades adicionales o posible sobrecalificación.
 - Consultar el detalle del CV.
 - Descartar candidatos sin eliminar los datos del CV.
+- Envío de correo electrónico a los candidatos de una vacante, según cambien el estado de la vacante o las postulaciones.
 
 ### Administrador 
 Es el rol que obtiene la primera persona que se registra.
@@ -67,7 +68,7 @@ ___
 - **Para crear un CV**: Nombre completo, Correo electrónico, Número telefónico, Domicilio, Titulo profesional o Cargo actual, Habilidades técnicas, Habilidades blandas, Experiencia Laboral, Más Información.
 - **Campos de una Vacante**: Título del puesto, Área o departamento, Típo de perfil, Modalidad, Ubicación, Descripción del puesto y Responsabilidades, Beneficios, Habilidades técnicas, Habilidades blandas, Fecha límite de recepción.
 - **Estados de una Vacante**: Abierta, Vencida, Cerrada, Archivada.
-- **Estados de una Postulación**: Sólo Enviada y Descartada por el momento.
+- **Estados de una Postulación**: Enviada, Bajo revisión, Entrevista programada, Contratado, Rechazado.
 
 ___
 
@@ -183,7 +184,7 @@ Si se carga la tabla de las postulaciones se puede ver que esta consta de cinco 
 - **Vacante**: esta muestra el nombre de la vacante.
 - **Fecha de postulación**.
 - **Match %**: muestra el porcentaje total de match calculado al crear la postulación.
-- **Estado**: muestra el estado de la postulación (recibida, bajo revisión, preseleciconado, entrevista programada, rechazada, contratado). (Todavía no se usan los estados más que recibida y rechazada).
+- **Estado**: muestra el estado de la postulación (recibida, bajo revisión, entrevista programada, rechazada, contratado). 
 - **Acciones**: 
     - Ver Vacante: Un botón que al pulsarlo muestra toda la información de la vacante. 
     - Detalles del Match: Despliega una sección informativa que muestra el puntaje de coincidencia exacta, el puntaje de coincidencia semántica y el análisis hecho por la IA (si es que se pudo conectar al servicio de IA al realizar la postulación), incluyendo su opinión y un juicio de fortalezas y debilidades encontrados en el candidato a la postulación.
@@ -216,7 +217,7 @@ ____
 ### Buscar Vacantes
 En "Vacantes"/`jobs.html` el buscador es capaz de usar lo que se escriba en él para filtrar las vacantes y mostrar las que contengan en alguno de sus campos la palabra que se busque. Básicamente hace búsqueda en tiempo real sobre todo el contenido de las vacantes y muestra las que contienen el texto exacto escrito en el buscador.
 
-Este buscador es sensible al selector de estado de vacantes. Por ejemplo, si se está en la sección de "Vacantes cerradas" y se escribe texto en el buscador se mostraran en la sección las vacantes cerradas que contengan texto iguaal al que se busca.
+Este buscador es sensible al selector de estado de vacantes. Por ejemplo, si se está en la sección de "Vacantes cerradas" y se escribe texto en el buscador se mostraran en la sección las vacantes cerradas que contengan texto igual al que se busca.
 
 ___
 ### Administración de Candidatos
@@ -284,9 +285,9 @@ ____
 - **¿La interfaz es responsiva (se ajusta a todos los tamaños de página)?** 
     **Respuesta**: Si.
 - **¿El sistema cuenta con envío de correos notificatorios sobre el estado de la postulación?** 
-    **Respuesta**: No, solo simulación de estos. Fecha del 26/10/2026
+    **Respuesta**: Si.
 - **¿Cómo puedo ver el resultado de mis postulaciones?** 
-    **Respuesta**: Para ver el resultado de tus postulaciones debes registrarte en el sistema para poder acceder a la tabla de postulaciones que realizaste. Ahí mismo encontrarás el análisis.
+    **Respuesta**: Para ver el resultado de tus postulaciones debes registrarte en el sistema para poder acceder a la tabla de postulaciones que realizaste. Ahí mismo encontrarás el análisis. O al postularte puedes recibir un correo con el porcentaje de match, mas no el desglose del análisis de tu postulación.
 - **¿Puedo subir más de un CV?** 
     **Respuesta**: No. El sistema guarda una sola versión de tu CV asociado al correo que se cargó en el CV.
 - **¿Puedo usar un archivo tipo Word o .docs para extraer su información?** 
@@ -303,4 +304,4 @@ ____
 - El texto de la descripción del trabajo debe tener mínimo 70 caracteres para guardarse. Esto se debe a que debe haber algo de información con la que se pueda hacer el cálculo del match.
 
 ## Notas finales
-Hasta el 26/10/2026 el sistema simula el envio de los correos. Si usted quisiera notificar a los candidatos sobre el estado de sus postulaciones o las vacantes, debe comunicarse directamente con él por otros medios. Aún así se recomienda al reclutador usar los botones que ofrece el sistema para ejecutar un ciclo de vida correcto de las vacantes y postulaciones.
+Hasta el 26/10/2026 el sistema puede trabajar con envío de correos real o simularlo.

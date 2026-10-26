@@ -26,6 +26,7 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 - Revisar candidatos con habilidades adicionales o posible sobrecalificación.
 - Consultar el detalle del CV.
 - Descartar candidatos.
+- Envío de correos con actualización de estado de postulaciones o vacantes.
 
 ### Reclutador
 - Inicio de sesión.
@@ -41,6 +42,7 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 - Revisar candidatos con habilidades adicionales o posible sobrecalificación.
 - Consultar el detalle del CV.
 - Descartar candidatos.
+- Envío de correos con actualización de estado de postulaciones o vacantes.
 
 ### Candidato
 - Listar y filtrar vacantes por texto, modalidad y área.
@@ -202,6 +204,11 @@ Espera hasta que en la terminal aparezca el mensaje `plurijob-api INFO: Applicat
 6. Copia la siguiente dirección y pégala en tu navegador para probar el sistema de forma local: 
 `http://127.0.0.1:5500/src/pages/` ó `http://localhost:5500/src/pages/`
 
+
+## Configuración para activar el envío de correos electrónicos
+- En el archivo `.env.example` (que se renombrará como `.env`) se encuentran las constantes que usa `email_service.py` para enviar correos, pero en formato de comentario. Si se quiere probar la función de envío de correos deben quitarse los símbolos hash (#) que acompañan a las constantes. De lo contrario, el envío de correos se simulará en la terminal.
+El correo de Google que se use tiene que tener forzosamente la verificación en dos pasos activada, de lo contrario no podrá adquirir una "Contraseña de aplicación", que es la que se usa en las variantes de `.env`.
+
 ## Respaldo de la base de datos
 Este proyecto tiene en la carpeta `backend/app/db/`:
 - `init_db.sql`: crea la estructura mínima y datos iniciales necesarios para un funcionamiento mínimo, como el contenido de email_templates y algunas habilidades blandas en skills_cache. Esta es la base "vacía" usada por el sistema cuando se levanta por primera vez el contenedor de Docker.
@@ -238,6 +245,7 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
 - Si el sistema se usa sin restaurar la base de datos con `backup.sql`, el primer usuario que se registre desde `signup.html` tendrá el rol **"admin"**, y podrá registrar reclutadores.
 - Si una persona sin registro se postula a una vacante, su CV vence en 12 meses. Al registrarse, se elimina la fecha de vencimiento del CV.
 - Un candidato tiene un límite de 3 postulaciones máximo. Esto con el fin de reducir la posibilidad de sobrecarga por peticiones en el servicio de Gemini.
+- Si el sistema se usa sin establecer un correo electrónico en .env para enviar correos, se simulará su envío en la terminal donde esté ejecutandose Docker
 
 ## Ejecución de Pruebas
 El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el motor de matching, autenticación, procesamiento de archivos y manejo de base de datos en el backend, entre otras funciones. Para ejecutar las pruebas almacenadas en `backend/tests/` se tiene que levantar el sistema tal cual está descrito en la sección **Configurar e Instalar**. No requiere la instalación de **pytest** porque este ya está incluido en el archivo `requirements.txt` (que Docker usa para crear el contenedor).
@@ -272,11 +280,9 @@ docker exec -it plurijob-api python -m pytest
 ```
 Para ejecutar `python -m pytest` desde tu máquina local, asegúrate de haber instalado previamente las dependencias ejecutando `pip install -r backend/requirements.txt` en tu propio entorno virtual.
 
-## Falta por implementar
-- Envio de correos reales a los candidatos
-
 __
 ## Notas para la evaluación:
 - Hasta el 26/10/2026 1:30 am, al ejecutar las pruebas pasaron 78 de 78 sin errores
-- El sistema hasta el momento simula el envio de correos a los candidatos de acuerdo al estado de la vacante en la que participan y el estado de su propia postulación. 
-- En los archivos subidos a plataforma se incluye una carpeta .zip con captura de pantalla de la interfaz de usuario sometida a revisión de los diferentes elementos y funciones de la página. Puede verse el uso de IA para las funciones para las que fue implementada, y pueden verse las capturas de las simulaciones de envio de correo en diferentes funciones del sistema.
+- El sistema ya puede enviar correos a los candidatos. Las variantes han sido establecidas en .env.example como comentarios para que quien use el sistema decida si usarlas o probar con la simulación.
+
+- En los archivos subidos a plataforma se incluye una carpeta .zip con captura de pantalla de la interfaz de usuario sometida a revisión de los diferentes elementos y funciones de la página. Puede verse el uso de IA para las funciones para las que fue implementada, y pueden verse las capturas de las simulaciones de envio de correo en diferentes funciones del sistema. También se han subido dos capturas de pantalla por aparte mostrando el correo enviado y recibido.
