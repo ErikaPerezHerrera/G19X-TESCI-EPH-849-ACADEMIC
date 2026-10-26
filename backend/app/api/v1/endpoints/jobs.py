@@ -15,6 +15,7 @@ from app.models.user import User
 
 from app.schemas.job import JobCreate, JobDraftRequest, JobOut, JobReopen
 
+from app.services.autostore_job import auto_archive_expired_closed_jobs
 from app.services.gemini_service import generate_job_draft_with_status
 from app.services.skill_cache_service import ensure_skills_cached
 from app.services.vector_service import (
@@ -45,6 +46,9 @@ def list_jobs(
     ):
     _sync_expired_jobs(db)
 
+    # Ejecutar la verificación de vacantes cerradas hace > 30 días
+    auto_archive_expired_closed_jobs(db)
+
     # Seguridad de visualización: Si no hay sesión o el usuario no es admin/reclutador,
     # se fuerza el filtro de estado a 'active' para evitar exposición de borradores o plantillas.
     is_staff = current_user is not None and getattr(current_user, "role", None) in [
@@ -67,7 +71,7 @@ def draft_job(
     payload: JobDraftRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-):
+    ):
     instruction = (payload.instruction or "").strip()
     source_text = (payload.source_text or "").strip()
     if not instruction and not source_text:
@@ -97,7 +101,7 @@ def create_job(
     payload: JobCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-):
+    ):
     raw_tech = payload.technical_skills or []
     raw_soft = payload.soft_skills or []
 
@@ -150,6 +154,10 @@ def create_job(
     return job
 
 
+from app.models.application import Application
+from app.services.email_service import send_templated_email
+
+
 ## Ruta para cerrar una vacante
 @router.patch("/{job_id}/close", response_model=JobOut)
 def close_job(
@@ -164,8 +172,21 @@ def close_job(
     job.status = "closed"
     db.commit()
     db.refresh(job)
-    return job
 
+    # Notificar a todos los candidatos postulados que la vacante ha sido cerrada
+    applications = db.query(Application).filter(Application.job_id == job.id).all()
+    for app in applications:
+        send_templated_email(
+            db,
+            to_email=app.candidate_email,
+            template_key="vacancy_closed",
+            context={
+                "candidate_name": app.candidate_email.split("@")[0],
+                "job_title": job.title,
+            },
+        )
+
+    return job
 
 ## Ruta para reabrir una vacante cerrada o vencida
 @router.patch("/{job_id}/reopen", response_model=JobOut)
@@ -244,10 +265,25 @@ def store_closed_job(
         )
 
     try:
-        # 1. Eliminar postulaciones relacionadas
+        # 1. Obtener las postulaciones ANTES de borrarlas para enviar el correo
+        applications = db.query(Application).filter(Application.job_id == job.id).all()
+
+        for app in applications:
+            send_templated_email(
+                db,
+                to_email=app.candidate_email,
+                template_key="status_update",
+                context={
+                    "candidate_name": app.candidate_email.split("@")[0],
+                    "job_title": job.title,
+                    "message": f"La vacante '{job.title}' en la que participabas ha sido archivada/eliminada. Tu postulación ha sido retirada para liberar tu cupo y ahora eres libre de participar en otro proceso de selección.",
+                },
+            )
+
+        # 2. Eliminar postulaciones relacionadas
         db.query(Application).filter(Application.job_id == job.id).delete()
 
-        # 2. Actualizar estado a stored
+        # 3. Actualizar estado a stored
         job.status = "stored"
 
         db.commit()
@@ -259,5 +295,4 @@ def store_closed_job(
             detail="No se pudo almacenar la vacante y eliminar sus postulaciones.",
         ) from exc
 
-    # Retornamos directamente el objeto job, ya que el response_model es JobOut
     return job

@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.main import app
 from app.core.config import settings
-from app.core.database import get_db, Base,engine, SessionLocal
+from app.core.database import get_db, Base,engine
 from app.core import database
 
 # 2. Obtener o construir la URL de la base de datos de forma segura
@@ -66,3 +66,13 @@ def client():
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def db_session():
+    """Proporciona una sesión de base de datos aislada para pruebas unitarias."""
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

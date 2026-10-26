@@ -354,7 +354,7 @@ VALUES
     (
         'status_update',
         'Actualización de tu postulación',
-        'Hola, hay una actualización en el estado de tu postulación.',
+        'Hola {{candidate_name}}, hay una actualización en el estado de tu postulación. {{message}}',
         TRUE
     )
 ON CONFLICT (template_key) DO NOTHING;

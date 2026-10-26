@@ -85,6 +85,7 @@ class JobDraftRequest(BaseModel):
         description="Texto base opcional extraído de un archivo PDF o documento.",
     )
 
+
 ## Esquema de salida (Output) para representar una vacante
 class JobOut(BaseModel):
     """
@@ -105,7 +106,9 @@ class JobOut(BaseModel):
     status: Literal["draft", "active", "closed", "expired", "stored"]
     deadline: Optional[datetime] = None
     benefits: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
-    class ConfigDict:
-        # En Pydantic v2 mapea directamente las propiedades del objeto SQLAlchemy (db_job)
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True
+    )  # <--- Sintaxis correcta para Pydantic v2

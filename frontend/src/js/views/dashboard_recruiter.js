@@ -342,7 +342,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     attachJobEventListeners();
   }
-
   function createJobCard(job, status) {
     const skills = job.technical_skills || job.soft_skills || [];
     const statusMap = {
@@ -355,6 +354,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     const isActive = status === "active";
     const isExpired = status === "expired";
     const isClosed = status === "closed";
+
+    // Cálculo de los días restantes para el auto-archivado (30 días desde updated_at)
+    let archivingInfo = "";
+    if (isClosed && job.updated_at) {
+      const closedDate = new Date(job.updated_at);
+      const now = new Date();
+      const diffTime = now - closedDate;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      const remainingDays = Math.max(0, 30 - diffDays);
+
+      archivingInfo = `
+      <div class="text-danger small fw-semibold mb-2">
+        <i class="bi bi-clock-history"></i> Se archiva automáticamente en: ${remainingDays} ${remainingDays === 1 ? "día" : "días"}
+      </div>
+    `;
+    }
 
     let buttons = `
     <button class="btn btn-sm btn-outline-secondary view-job-btn" data-id="${job.id}">
@@ -388,6 +403,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (isClosed) {
+      console.log("Job cerrado:", job.title, "Updated at:", job.updated_at);
       buttons += `
       <button class="btn btn-outline-success btn-sm toggle-status-btn" data-job-id="${job.id}" data-action="reopen">
         <i class="bi bi-arrow-counterclockwise"></i> Reabrir
@@ -417,6 +433,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             <i class="bi bi-building"></i> ${job.area || "N/A"} |
             <i class="bi bi-laptop"></i> ${job.modality || job.work_mode || "N/A"}
           </p>
+
+          <!-- Información de los días restantes para vacantes cerradas -->
+          ${archivingInfo}
+
           <p class="card-text text-truncate flex-grow-1">${job.description || ""}</p>
 
           <div class="d-flex flex-wrap gap-1 mb-3">

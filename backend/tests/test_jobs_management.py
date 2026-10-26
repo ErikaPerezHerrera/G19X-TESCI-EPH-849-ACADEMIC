@@ -1,3 +1,4 @@
+import uuid
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 from datetime import datetime, timezone, timedelta
@@ -7,6 +8,8 @@ from app.main import app
 from app.models.application import Application
 from app.models.job import Job
 from app.models.user import User
+
+from app.services.autostore_job import auto_archive_expired_closed_jobs
 
 
 def reset_database():
@@ -22,7 +25,7 @@ def reset_database():
 
 def get_auth_token_for_recruiter(
     client: TestClient, email: str = "recruiter@example.com"
-) -> str:
+    ) -> str:
     """Función auxiliar para registrar un usuario y obtener su token JWT."""
     client.post(
         "/api/v1/auth/register",
@@ -44,7 +47,7 @@ def get_auth_token_for_recruiter(
 
 def get_auth_token_for_admin(
     client: TestClient, email: str = "admin@example.com"
-) -> str:
+    ) -> str:
     """Registra al primer usuario y fuerza su rol a 'admin' en la base de datos."""
     token = get_auth_token_for_recruiter(client, email)
 
@@ -370,3 +373,45 @@ def test_list_jobs_unauthenticated_draft_forced_to_active():
         # por lo que no debe retornar el borrador.
         jobs = response.json()
         assert len(jobs) == 0
+
+
+def test_auto_archive_expired_closed_jobs_success(db_session, client):
+    """
+    Valida que la función de auto-archivado detecte vacantes cerradas hace más de 30 días,
+    elimine sus postulaciones (liberando slots) y cambie su estado a 'stored'.
+    """
+    # 0. Registrar el reclutador usando el helper existente para evitar problemas con los campos del modelo
+    get_auth_token_for_recruiter(client, email="auto_recruiter@example.com")
+
+    # Obtener el usuario creado desde la sesión de la base de datos de pruebas
+    recruiter_user = (
+        db_session.query(User)
+        .filter(User.email == "auto_recruiter@example.com")
+        .first()
+    )
+
+    # 1. Crear una vacante simulada con el ID del reclutador obtenido
+    expired_job = Job(
+        id=uuid.uuid4(),
+        title="Vacante Antigua Cerrada",
+        area="IT",
+        profile_type="Junior",
+        modality="remoto",
+        description="Esta vacante lleva cerrada más de 30 días para pruebas de auto-archivado.",
+        status="closed",
+        recruiter_id=recruiter_user.id,  # <--- ID válido garantizado
+    )
+    db_session.add(expired_job)
+    db_session.commit()
+    db_session.refresh(expired_job)
+
+    # 2. Forzar artificialmente el campo updated_at a hace 31 días atrás
+    expired_job.updated_at = datetime.now(timezone.utc) - timedelta(days=31)
+    db_session.commit()
+
+    # 3. Ejecutar la función de auto-archivado
+    auto_archive_expired_closed_jobs(db_session)
+    db_session.refresh(expired_job)
+
+    # 4. Aserciones para comprobar que el estado cambió a 'stored'
+    assert expired_job.status == "stored"

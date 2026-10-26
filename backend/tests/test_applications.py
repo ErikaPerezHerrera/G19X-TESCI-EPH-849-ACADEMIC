@@ -8,7 +8,7 @@ from app.main import app
 
 def get_auth_token_for_user(
     client: TestClient, email: str, role_password: str = "securepassword123"
-) -> str:
+    ) -> str:
     """Registra un usuario y retorna su token JWT de acceso."""
     client.post(
         "/api/v1/auth/register",
@@ -32,7 +32,7 @@ def create_mock_resume_and_job(
     client: TestClient,
     recruiter_token: str,
     candidate_email: str = "candidate@example.com",
-):
+    ):
     """Función de apoyo para crear un CV y una Vacante activa en la BD de pruebas."""
     from app.models.user import User
     from app.models.resume import Resume
