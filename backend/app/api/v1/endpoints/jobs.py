@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ from app.models.user import User
 from app.schemas.job import JobCreate, JobDraftRequest, JobOut, JobReopen
 
 from app.services.autostore_job import auto_archive_expired_closed_jobs
-from app.services.email_service import send_templated_email
+from app.services.email_service import send_email, render_template
 from app.services.gemini_service import generate_job_draft_with_status
 from app.services.skill_cache_service import ensure_skills_cached
 from app.services.vector_service import (
@@ -41,17 +41,16 @@ def _sync_expired_jobs(db: Session) -> None:
 ## Ruta para listar vacantes con opción de filtrar por estado
 @router.get("", response_model=list[JobOut])
 def list_jobs(
+    background_tasks: BackgroundTasks,
     status_filter: Optional[str] = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_current_user),
-    ):
+):
     _sync_expired_jobs(db)
 
     # Ejecutar la verificación de vacantes cerradas hace > 30 días
-    auto_archive_expired_closed_jobs(db)
+    auto_archive_expired_closed_jobs(db, background_tasks)
 
-    # Seguridad de visualización: Si no hay sesión o el usuario no es admin/reclutador,
-    # se fuerza el filtro de estado a 'active' para evitar exposición de borradores o plantillas.
     is_staff = current_user is not None and getattr(current_user, "role", None) in [
         "admin",
         "recruiter",
@@ -72,7 +71,7 @@ def draft_job(
     payload: JobDraftRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-    ):
+):
     instruction = (payload.instruction or "").strip()
     source_text = (payload.source_text or "").strip()
     if not instruction and not source_text:
@@ -102,7 +101,7 @@ def create_job(
     payload: JobCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-    ):
+):
     raw_tech = payload.technical_skills or []
     raw_soft = payload.soft_skills or []
 
@@ -159,29 +158,37 @@ def create_job(
 @router.patch("/{job_id}/close", response_model=JobOut)
 def close_job(
     job_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-    ):
+):
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
 
-    job.status = "closed"
-    db.commit()
-    db.refresh(job)
-
-    # Notificar a todos los candidatos postulados que la vacante ha sido cerrada
+    # 1. Consultar postulaciones ANTES del commit para poder renderizar
     applications = db.query(Application).filter(Application.job_id == job.id).all()
+
+    emails_to_notify = []
     for app in applications:
-        send_templated_email(
+        subject, body = render_template(
             db,
-            to_email=app.candidate_email,
-            template_key="vacancy_closed",
-            context={
+            "vacancy_closed",
+            {
                 "candidate_name": app.candidate_email.split("@")[0],
                 "job_title": job.title,
             },
         )
+        emails_to_notify.append((app.candidate_email, subject, body))
+
+    # 2. Actualizar estado y hacer commit primero
+    job.status = "closed"
+    db.commit()
+    db.refresh(job)
+
+    # 3. Encolar tareas de envío en segundo plano
+    for email, subject, body in emails_to_notify:
+        background_tasks.add_task(send_email, email, subject, body)
 
     return job
 
@@ -190,6 +197,7 @@ def close_job(
 @router.patch("/{job_id}/reopen", response_model=JobOut)
 def reopen_job(
     job_id: str,
+    background_tasks: BackgroundTasks,
     payload: JobReopen,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
@@ -220,6 +228,25 @@ def reopen_job(
                 detail="La nueva fecha límite debe ser posterior al momento actual.",
             )
 
+    # 1. Obtener postulaciones y renderizar templates antes de hacer commit
+    applications = db.query(Application).filter(Application.job_id == job.id).all()
+    emails_to_notify = []
+
+    for app in applications:
+        subject, body = render_template(
+            db,
+            "status_update",
+            {
+                "candidate_name": "Candidato/a",
+                "job_title": job.title,
+                "message": "La vacante a la que te habías postulado ha sido reabierta. Tu proceso continúa activo.",
+                "default_subject": f"Vacante Reabierta: {job.title}",
+                "default_body": f"Hola, te informamos que la vacante '{job.title}' ha sido reabierta.",
+            },
+        )
+        emails_to_notify.append((app.candidate_email, subject, body))
+
+    # 2. Modificar y hacer commit
     job.deadline = deadline
     job.status = "active"
 
@@ -233,28 +260,9 @@ def reopen_job(
             detail="No se pudo reabrir la vacante.",
         ) from exc
 
-    # ==========================================
-    # Notificar por correo a los candidatos postulados
-    # ==========================================
-    from app.services.email_service import send_templated_email
-    from app.models.application import Application
-
-    applications = db.query(Application).filter(Application.job_id == job.id).all()
-    for app_item in applications:
-        if app_item.candidate_email:
-            context = {
-                "candidate_name": "Candidato/a",
-                "job_title": job.title,
-                "message": "La vacante a la que te habías postulado ha sido reabierta. Tu proceso continúa activo.",
-                "default_subject": f"Vacante Reabierta: {job.title}",
-                "default_body": f"Hola, te informamos que la vacante '{job.title}' ha sido reabierta.",
-            }
-            send_templated_email(
-                db=db,
-                to_email=app_item.candidate_email,
-                template_key="status_update",
-                context=context,
-            )
+    # 3. Encolar los correos al finalizar con éxito
+    for email, subject, body in emails_to_notify:
+        background_tasks.add_task(send_email, email, subject, body)
 
     return job
 
@@ -263,6 +271,7 @@ def reopen_job(
 @router.patch("/{job_id}/store", response_model=JobOut)
 def store_closed_job(
     job_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
 ):
@@ -285,26 +294,25 @@ def store_closed_job(
             detail="Solo se pueden almacenar vacantes que se encuentren en estado cerrado.",
         )
 
+    # 1. Obtener postulaciones y renderizar templates antes de eliminarlas o hacer commit
+    applications = db.query(Application).filter(Application.job_id == job.id).all()
+    emails_to_notify = []
+
+    for app in applications:
+        subject, body = render_template(
+            db,
+            "status_update",
+            {
+                "candidate_name": app.candidate_email.split("@")[0],
+                "job_title": job.title,
+                "message": f"La vacante '{job.title}' en la que participabas ha sido archivada/eliminada. Tu postulación ha sido retirada para liberar tu cupo y ahora eres libre de participar en otro proceso de selección.",
+            },
+        )
+        emails_to_notify.append((app.candidate_email, subject, body))
+
     try:
-        # 1. Obtener las postulaciones ANTES de borrarlas para enviar el correo
-        applications = db.query(Application).filter(Application.job_id == job.id).all()
-
-        for app in applications:
-            send_templated_email(
-                db,
-                to_email=app.candidate_email,
-                template_key="status_update",
-                context={
-                    "candidate_name": app.candidate_email.split("@")[0],
-                    "job_title": job.title,
-                    "message": f"La vacante '{job.title}' en la que participabas ha sido archivada/eliminada. Tu postulación ha sido retirada para liberar tu cupo y ahora eres libre de participar en otro proceso de selección.",
-                },
-            )
-
-        # 2. Eliminar postulaciones relacionadas
+        # 2. Eliminar postulaciones y actualizar estado a stored
         db.query(Application).filter(Application.job_id == job.id).delete()
-
-        # 3. Actualizar estado a stored
         job.status = "stored"
 
         db.commit()
@@ -315,5 +323,9 @@ def store_closed_job(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se pudo almacenar la vacante y eliminar sus postulaciones.",
         ) from exc
+
+    # 3. Encolar los correos al finalizar con éxito
+    for email, subject, body in emails_to_notify:
+        background_tasks.add_task(send_email, email, subject, body)
 
     return job

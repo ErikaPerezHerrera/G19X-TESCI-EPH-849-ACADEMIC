@@ -64,6 +64,15 @@ class Settings(BaseSettings):
 
         return f"postgresql+psycopg2://{user}:{password}@{server}:{port}/{db}?sslmode=disable"
 
+    ## Comentario: CONFIGURACION PARA ENVIAR CORREOS
+    # (si SMTP_USER o SMTP_PASSWORD están vacíos, se simula) ---
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    EMAILS_FROM_EMAIL: str = "noreply@plurijob.com"
+    EMAILS_FROM_NAME: str = "PluriJob"
+
     # --- CONFIGURACIÓN DE CORS ---
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5500",

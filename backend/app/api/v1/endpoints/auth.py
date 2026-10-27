@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -23,7 +24,8 @@ from app.schemas.user import Token, UserCreate, UserLogin, UserOut
 
 from app.services.email_service import (
     validate_email_format_and_existence,
-    send_templated_email,
+    send_email,
+    render_template,
 )
 
 router = APIRouter(tags=["auth"])
@@ -39,14 +41,17 @@ def _resolve_registration_role(db: Session, requested_role: str | None) -> str:
         return "admin"
     return "admin"
 
+
 ## Ruta de autenticación y registro de usuarios
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-
-## Registro de usuario nuevo (rol registered o admin según corresponda)
-def register_user(payload: UserCreate, db: Session = Depends(get_db)):
+def register_user(
+    payload: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Registra un nuevo usuario en la plataforma.
-    El primer usuario en resistrarse será admin; el resto se registran como candidatos.
+    El primer usuario en registrarse será admin; el resto se registran como candidatos.
     """
     email = payload.email.lower()
 
@@ -55,13 +60,6 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
 
     existing_user = db.query(User).filter(func.lower(User.email) == email).first()
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo electrónico ya está registrado.",
-        )
-
-    # Validar que el correo no esté registrado ya
-    if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El correo electrónico ya está registrado.",
@@ -81,14 +79,6 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.flush()
 
-    # Enviar correo de bienvenida utilizando la plantilla de la BD
-    send_templated_email(
-        db,
-        to_email=user.email,
-        template_key="account_created",
-        context={"candidate_name": user.full_name or "Usuario"},
-    )
-
     # Se asocia con un CV existente si corresponde y se cambia la fecha de expiración del CV a None para que no caduque.
     resume = (
         db.query(Resume)
@@ -101,8 +91,22 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     if resume is not None:
         resume.user_id = user.id
         resume.expires_at = None
+
+    # Hacer commit y refresh primero
     db.commit()
     db.refresh(user)
+
+    # Enviar correo de bienvenida solo si es un usuario candidato (registered/casual)
+    if resolved_role in ("registered", "casual"):
+        subject, body = render_template(
+            db,
+            "account_created",
+            {
+                "candidate_name": user.full_name or "Usuario",
+            },
+        )
+        background_tasks.add_task(send_email, user.email, subject, body)
+
     return user
 
 
@@ -112,13 +116,12 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     response_model=UserOut,
     status_code=status.HTTP_201_CREATED,
 )
-## Para poder crear la cuenta de recruiter, el usuario que hace la petición debe ser admin y estar autenticado.
 def register_recruiter(
     payload: UserCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
-    """Ruta administrativa para crear cuentas con rol recruiter."""
+    """Ruta administrativa para crear cuentas con rol recruiter (sin envío de correo de candidatos)."""
 
     email = payload.email.lower()
 
@@ -131,13 +134,6 @@ def register_recruiter(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El correo electrónico ya está registrado.",
         )
-    
-    # Validar que el correo no esté registrado ya
-    if db.query(User).filter(func.lower(User.email) == email).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo electrónico ya está registrado.",
-        )
 
     password = payload.password
 
@@ -146,6 +142,7 @@ def register_recruiter(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La contraseña debe tener al menos 12 caracteres.",
         )
+
     user = User(
         email=email,
         full_name=payload.full_name,
@@ -194,7 +191,7 @@ def login_user(payload: UserLogin, db: Session = Depends(get_db)):
         subject=user.email,
         expires_delta=access_token_expires,
     )
-    # Se devuelve el token de acceso junto con el correo electrónico y el rol del usuario.
+
     return {
         "access_token": access_token,
         "token_type": "bearer",

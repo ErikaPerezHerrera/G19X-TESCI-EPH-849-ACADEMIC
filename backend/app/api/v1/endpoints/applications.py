@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -21,8 +21,7 @@ from app.models.user import User
 from app.schemas.application import ApplicationCreate, ApplicationOut, ApplicationReject
 
 from app.services.matching_engine import recalculate_application_match
-from app.services.skill_cache_service import ensure_skills_cached
-from app.services.email_service import send_templated_email
+from app.services.email_service import send_email, render_template
 
 router = APIRouter(prefix="", tags=["applications"])
 
@@ -45,7 +44,7 @@ def _validate_job_active_for_applications(job: Job):
         )
 
 
-## --- RUTAS ESPECÍfICAS DE CANDIDATO (Primero las fijas) ---
+## --- RUTAS ESPECÍFICAS DE CANDIDATO (Primero las fijas) ---
 
 
 ## Ruta para listar postulaciones del usuario autenticado
@@ -69,6 +68,7 @@ def list_my_applications(
 )
 def create_application(
     job_id: UUID,
+    background_tasks: BackgroundTasks,
     payload: ApplicationCreate,
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
@@ -171,6 +171,7 @@ def create_application(
     db.commit()
     db.refresh(application)
 
+    ## Calcular el match
     try:
         recalculate_application_match(application, db)
         db.commit()
@@ -188,16 +189,17 @@ def create_application(
         else "N/A"
     )
 
-    send_templated_email(
+    subject, body = render_template(
         db,
-        to_email=application.candidate_email,
-        template_key="application_received",
-        context={
+        "application_received",
+        {
             "candidate_name": application.candidate_email.split("@")[0],
             "job_title": job.title,
             "match_score": match_percentage,
         },
     )
+
+    background_tasks.add_task(send_email, application.candidate_email, subject, body)
 
     return application
 
@@ -206,6 +208,7 @@ def create_application(
 @router.delete("/applications/{application_id}", status_code=status.HTTP_200_OK)
 def cancel_application(
     application_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -236,11 +239,10 @@ def cancel_application(
     candidate_email = application.candidate_email
     job_title = job.title if job else "la vacante"
 
-    send_templated_email(
+    subject, body = render_template(
         db,
-        to_email=candidate_email,
-        template_key="status_update",
-        context={
+        "status_update",
+        {
             "candidate_name": candidate_email.split("@")[0],
             "job_title": job_title,
             "message": f"Has cancelado exitosamente tu postulación a la vacante '{job_title}'. Tu cupo ha sido liberado y eres libre de participar en otro proceso de selección.",
@@ -249,6 +251,8 @@ def cancel_application(
 
     db.delete(application)
     db.commit()
+
+    background_tasks.add_task(send_email, candidate_email, subject, body)
 
     return {"message": "Postulación cancelada con éxito"}
 
@@ -277,6 +281,7 @@ def list_job_applications(
 @router.patch("/applications/{application_id}/view", response_model=ApplicationOut)
 def mark_application_as_viewed(
     application_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
 ):
@@ -289,7 +294,6 @@ def mark_application_as_viewed(
     job = db.query(Job).filter(Job.id == application.job_id).first()
     _validate_job_active_for_applications(job)
 
-    # Transición estricta: solo desde application_received (o received)
     valid_previous_states = ["received", "application_received"]
     if application.status not in valid_previous_states:
         raise HTTPException(
@@ -301,15 +305,16 @@ def mark_application_as_viewed(
     db.commit()
     db.refresh(application)
 
-    send_templated_email(
+    subject, body = render_template(
         db,
-        to_email=application.candidate_email,
-        template_key="application_under_review",
-        context={
+        "application_under_review",
+        {
             "candidate_name": application.candidate_email.split("@")[0],
             "job_title": job.title if job else "la vacante",
         },
     )
+
+    background_tasks.add_task(send_email, application.candidate_email, subject, body)
 
     return application
 
@@ -318,6 +323,7 @@ def mark_application_as_viewed(
 @router.patch("/applications/{application_id}/interview", response_model=ApplicationOut)
 def schedule_interview_application(
     application_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
 ):
@@ -330,7 +336,6 @@ def schedule_interview_application(
     job = db.query(Job).filter(Job.id == application.job_id).first()
     _validate_job_active_for_applications(job)
 
-    # Transición estricta: solo desde application_under_review
     if application.status != "application_under_review":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -341,15 +346,17 @@ def schedule_interview_application(
     db.commit()
     db.refresh(application)
 
-    send_templated_email(
+    subject, body = render_template(
         db,
-        to_email=application.candidate_email,
-        template_key="interview_progress",
-        context={
+        "interview_progress",
+        {
             "candidate_name": application.candidate_email.split("@")[0],
             "job_title": job.title if job else "la vacante",
         },
     )
+
+    background_tasks.add_task(send_email, application.candidate_email, subject, body)
+
     return application
 
 
@@ -357,6 +364,7 @@ def schedule_interview_application(
 @router.patch("/applications/{application_id}/hire", response_model=ApplicationOut)
 def hire_application(
     application_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
 ):
@@ -369,14 +377,12 @@ def hire_application(
     job = db.query(Job).filter(Job.id == application.job_id).first()
     _validate_job_active_for_applications(job)
 
-    # Transición estricta: solo desde interview_scheduled
     if application.status != "interview_scheduled":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="La postulación debe encontrarse en estado 'interview_scheduled' para poder contratar al candidato.",
         )
 
-    # Restricción: hired solo puede aplicarse a un postulado a la vez por vacante
     existing_hired = (
         db.query(Application)
         .filter(
@@ -397,21 +403,17 @@ def hire_application(
     if job:
         job.status = "closed"
 
-    db.commit()
-    db.refresh(application)
-
-    # 1. Notificar al candidato contratado
-    send_templated_email(
+    # 1. Renderizar plantilla del candidato contratado antes del commit
+    subject_hired, body_hired = render_template(
         db,
-        to_email=application.candidate_email,
-        template_key="hired",
-        context={
+        "hired",
+        {
             "candidate_name": application.candidate_email.split("@")[0],
             "job_title": job.title if job else "la vacante",
         },
     )
 
-    # 2. Notificar a los demás postulantes
+    # 2. Consultar y renderizar plantillas de los demás postulantes antes del commit
     other_applications = (
         db.query(Application)
         .filter(
@@ -420,16 +422,30 @@ def hire_application(
         .all()
     )
 
-    for other_app in other_applications:
-        send_templated_email(
+    other_emails_to_notify = []
+    for app in other_applications:
+        subject_closed, body_closed = render_template(
             db,
-            to_email=other_app.candidate_email,
-            template_key="vacancy_closed",
-            context={
-                "candidate_name": other_app.candidate_email.split("@")[0],
+            "vacancy_closed",
+            {
+                "candidate_name": app.candidate_email.split("@")[0],
                 "job_title": job.title if job else "la vacante",
             },
         )
+        other_emails_to_notify.append(
+            (app.candidate_email, subject_closed, body_closed)
+        )
+
+    # 3. Hacer el commit primero
+    db.commit()
+    db.refresh(application)
+
+    # 4. Encolar las tareas en segundo plano después del commit
+    background_tasks.add_task(
+        send_email, application.candidate_email, subject_hired, body_hired
+    )
+    for email, sub, body in other_emails_to_notify:
+        background_tasks.add_task(send_email, email, sub, body)
 
     return application
 
@@ -438,6 +454,7 @@ def hire_application(
 @router.patch("/applications/{application_id}/reject", status_code=status.HTTP_200_OK)
 def reject_application(
     application_id: UUID,
+    background_tasks: BackgroundTasks,
     payload: ApplicationReject,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
@@ -455,6 +472,7 @@ def reject_application(
     _validate_job_active_for_applications(job)
 
     candidate_email = application.candidate_email
+    job_title = job.title if job else "la vacante"
 
     rejection_reason = (
         f" Motivo del descarte: {payload.rejection_reason}."
@@ -462,18 +480,19 @@ def reject_application(
         else ""
     )
 
-    send_templated_email(
+    # 1. Renderizar plantilla con la sesión activa antes de eliminar
+    subject, body = render_template(
         db,
-        to_email=candidate_email,
-        template_key="application_rejected",
-        context={
+        "application_rejected",
+        {
             "candidate_name": candidate_email.split("@")[0],
-            "job_title": job.title if job else "la vacante",
+            "job_title": job_title,
             "rejection_reason": rejection_reason,
         },
     )
 
     try:
+        # 2. Hacer commit / delete primero
         db.delete(application)
         db.commit()
     except Exception as exc:
@@ -482,6 +501,9 @@ def reject_application(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se pudo procesar el descarte de la postulación.",
         ) from exc
+
+    # 3. Encolar el correo al finalizar con éxito
+    background_tasks.add_task(send_email, candidate_email, subject, body)
 
     return {
         "message": "Postulación rechazada y eliminada correctamente.",

@@ -29,7 +29,7 @@ def test_first_user_registers_as_admin():
             "/api/v1/auth/register",
             json={
                 "email": "admin@example.com",
-                "password": "123456",
+                "password": "securepassword123",
                 "full_name": "Admin Principal",
             },
         )
@@ -50,7 +50,7 @@ def test_second_user_registers_as_standard_user():
             "/api/v1/auth/register",
             json={
                 "email": "admin@example.com",
-                "password": "123456",
+                "password": "securepassword123",
                 "full_name": "Admin Principal",
             },
         )
@@ -60,14 +60,13 @@ def test_second_user_registers_as_standard_user():
             "/api/v1/auth/register",
             json={
                 "email": "candidate@example.com",
-                "password": "123456",
+                "password": "securepassword123",
                 "full_name": "Candidato Prueba",
             },
         )
 
         assert response.status_code == 201, response.text
         payload = response.json()
-        # El rol por defecto para usuarios subsiguientes suele ser candidate o user
         assert payload["role"] != "admin"
         assert payload["email"] == "candidate@example.com"
 
@@ -79,7 +78,7 @@ def test_register_duplicate_email_fails():
     with TestClient(app) as client:
         user_data = {
             "email": "duplicado@example.com",
-            "password": "123456",
+            "password": "securepassword123",
             "full_name": "Usuario Uno",
         }
 
@@ -92,6 +91,24 @@ def test_register_duplicate_email_fails():
         assert res2.status_code in [400, 422], "Debe fallar por correo duplicado"
 
 
+def test_register_invalid_email_format_fails():
+    """Valida que se rechace un registro si el formato del correo electrónico no es válido."""
+    reset_database()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "correo_invalido_sin_dominio",
+                "password": "securepassword123",
+                "full_name": "Usuario Error",
+            },
+        )
+        assert response.status_code in [400, 422]
+        detail_str = str(response.json()["detail"]).lower()
+        assert "correo electrónico" in detail_str or "email" in detail_str
+
+
 def test_admin_user_has_recruiter_access():
     """Valida el inicio de sesión del admin y el acceso a rutas protegidas con Token JWT."""
     reset_database()
@@ -101,7 +118,7 @@ def test_admin_user_has_recruiter_access():
             "/api/v1/auth/register",
             json={
                 "email": "admin@example.com",
-                "password": "123456",
+                "password": "securepassword123",
                 "full_name": "Admin Principal",
             },
         )
@@ -111,7 +128,7 @@ def test_admin_user_has_recruiter_access():
             "/api/v1/auth/login",
             json={
                 "email": "admin@example.com",
-                "password": "123456",
+                "password": "securepassword123",
             },
         )
         assert login_response.status_code == 200, login_response.text
@@ -129,17 +146,15 @@ def test_login_invalid_credentials():
     reset_database()
 
     with TestClient(app) as client:
-        # Registrar usuario primero
         client.post(
             "/api/v1/auth/register",
             json={
                 "email": "test@example.com",
-                "password": "correctpassword",
+                "password": "correctpassword123",
                 "full_name": "Test User",
             },
         )
 
-        # Intentar login con contraseña incorrecta
         response = client.post(
             "/api/v1/auth/login",
             json={
@@ -153,11 +168,6 @@ def test_login_invalid_credentials():
 def test_unauthorized_access_without_token():
     """Valida que las rutas protegidas nieguen el acceso si no se provee un token de autorización."""
     with TestClient(app) as client:
-        response = client.get(
-            "/api/v1/jobs"
-        )  # O cualquier ruta protegida de administración/creación
-        # Dependiendo de si /api/v1/jobs permite lectura pública o no,
-        # puedes usar una ruta estrictamente protegida como POST /api/v1/jobs
         post_response = client.post(
             "/api/v1/jobs", json={"title": "Vacante sin permiso"}
         )
@@ -169,7 +179,6 @@ def test_admin_can_register_recruiter():
     reset_database()
 
     with TestClient(app) as client:
-        # 1. Registrar al primer usuario (que automáticamente se vuelve 'admin')
         client.post(
             "/api/v1/auth/register",
             json={
@@ -179,7 +188,6 @@ def test_admin_can_register_recruiter():
             },
         )
 
-        # 2. Hacer login como admin para obtener su token JWT
         login_res = client.post(
             "/api/v1/auth/login",
             json={
@@ -189,7 +197,6 @@ def test_admin_can_register_recruiter():
         )
         admin_token = login_res.json()["access_token"]
 
-        # 3. El admin crea una cuenta de reclutador usando el endpoint protegido
         recruiter_res = client.post(
             "/api/v1/auth/register/recruiter",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -206,12 +213,47 @@ def test_admin_can_register_recruiter():
         assert data["role"] == "recruiter"
 
 
+def test_register_recruiter_short_password_fails():
+    """Valida que falle el registro de un reclutador si la contraseña tiene menos caracteres de los permitidos."""
+    reset_database()
+
+    with TestClient(app) as client:
+        client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "admin@example.com",
+                "password": "securepassword123",
+                "full_name": "Admin Principal",
+            },
+        )
+
+        login_res = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "admin@example.com",
+                "password": "securepassword123",
+            },
+        )
+        admin_token = login_res.json()["access_token"]
+
+        response = client.post(
+            "/api/v1/auth/register/recruiter",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={
+                "email": "recruiter_short@example.com",
+                "password": "short",
+                "full_name": "Reclutador Corto",
+            },
+        )
+
+        assert response.status_code in [400, 422]
+
+
 def test_non_admin_cannot_register_recruiter_fails():
     """Valida que un usuario común (no admin) no tenga permisos para registrar reclutadores."""
     reset_database()
 
     with TestClient(app) as client:
-        # 1. Registrar al admin principal
         client.post(
             "/api/v1/auth/register",
             json={
@@ -221,7 +263,6 @@ def test_non_admin_cannot_register_recruiter_fails():
             },
         )
 
-        # 2. Registrar y loguear a un usuario normal / candidato
         client.post(
             "/api/v1/auth/register",
             json={
@@ -239,16 +280,14 @@ def test_non_admin_cannot_register_recruiter_fails():
         )
         candidate_token = login_res.json()["access_token"]
 
-        # 3. Intentar registrar un reclutador usando el token del candidato (Debe fallar por permisos)
         response = client.post(
             "/api/v1/auth/register/recruiter",
             headers={"Authorization": f"Bearer {candidate_token}"},
             json={
                 "email": "malicious_recruiter@example.com",
-                "password": "password123",
+                "password": "securepassword123",
                 "full_name": "Intruso",
             },
         )
 
-        # FastAPI / dependencias de seguridad deben retornar 401 o 403 al no ser admin
         assert response.status_code in [401, 403], response.text

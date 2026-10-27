@@ -3,15 +3,16 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, BackgroundTasks
 
 from app.api.v1.endpoints import jobs
 from app.schemas.job import JobReopen
 
 
 class FakeQuery:
-    def __init__(self, value):
+    def __init__(self, value, model=None):
         self.value = value
+        self.model = model
 
     def filter(self, *_conditions):
         return self
@@ -20,8 +21,9 @@ class FakeQuery:
         return self
 
     def first(self):
-        # Si la consulta es para una plantilla de correo, devolvemos un objeto con subject y body_text
-        if isinstance(self.value, str) or getattr(self, "is_template_query", False):
+        from app.models.email_template import EmailTemplate
+
+        if self.model == EmailTemplate:
             return SimpleNamespace(
                 template_key="status_update",
                 subject="Actualización de vacante: {{job_title}}",
@@ -30,7 +32,12 @@ class FakeQuery:
         return self.value
 
     def all(self):
-        return [SimpleNamespace(candidate_email="candidato_prueba@example.com")]
+        from app.models.application import Application
+
+        if self.model == Application:
+            # Retornar una lista con postulaciones simuladas para que el bucle de correo funcione
+            return [SimpleNamespace(candidate_email="candidato_prueba@example.com")]
+        return [self.value] if self.value else []
 
     def delete(self, synchronize_session=False):
         return 0
@@ -43,14 +50,14 @@ class FakeDatabase:
         self.rolled_back = False
 
     def query(self, model):
-        # Verificamos si están consultando EmailTemplate
         from app.models.email_template import EmailTemplate
+        from app.models.application import Application
 
         if model == EmailTemplate:
-            query_obj = FakeQuery(None)
-            query_obj.is_template_query = True
-            return query_obj
-        return FakeQuery(self.job)
+            return FakeQuery(None, model=EmailTemplate)
+        if model == Application:
+            return FakeQuery(self.job, model=Application)
+        return FakeQuery(self.job, model=model)
 
     def commit(self):
         self.committed = True
@@ -87,6 +94,7 @@ def test_reopening_closed_job_updates_same_record(monkeypatch):
     original_title = job.title
     existing_embedding = job.embedding
     db = FakeDatabase(job)
+    bg_tasks = BackgroundTasks()
     monkeypatch.setattr(jobs, "ensure_skills_cached", lambda *_args: None)
 
     def fail_if_embedding_is_generated(_text):
@@ -99,6 +107,7 @@ def test_reopening_closed_job_updates_same_record(monkeypatch):
 
     result = jobs.reopen_job(
         str(job.id),
+        bg_tasks,
         JobReopen(deadline=deadline),
         db,
         SimpleNamespace(id="different-recruiter-id", role="recruiter"),
@@ -119,6 +128,7 @@ def test_reopening_expired_job_only_changes_deadline(monkeypatch):
     job.embedding = existing_embedding
     original_title = job.title
     db = FakeDatabase(job)
+    bg_tasks = BackgroundTasks()
 
     def fail_if_embedding_is_generated(_text):
         raise AssertionError(
@@ -130,6 +140,7 @@ def test_reopening_expired_job_only_changes_deadline(monkeypatch):
 
     result = jobs.reopen_job(
         str(job.id),
+        bg_tasks,
         JobReopen(deadline=deadline),
         db,
         SimpleNamespace(id="different-recruiter-id", role="recruiter"),
@@ -145,9 +156,11 @@ def test_reopening_expired_job_only_changes_deadline(monkeypatch):
 def test_recruiter_can_close_an_expired_job_created_by_another_recruiter():
     job = make_job("expired")
     db = FakeDatabase(job)
+    bg_tasks = BackgroundTasks()
 
     result = jobs.close_job(
         str(job.id),
+        bg_tasks,
         db,
         SimpleNamespace(id="different-recruiter-id", role="recruiter"),
     )
@@ -160,10 +173,12 @@ def test_recruiter_can_close_an_expired_job_created_by_another_recruiter():
 def test_expired_job_cannot_be_reopened_without_future_deadline():
     job = make_job("expired")
     db = FakeDatabase(job)
+    bg_tasks = BackgroundTasks()
 
     with pytest.raises(HTTPException) as error:
         jobs.reopen_job(
             str(job.id),
+            bg_tasks,
             JobReopen(deadline=datetime.now(timezone.utc) - timedelta(days=1)),
             db,
             SimpleNamespace(id="recruiter-id"),
@@ -176,10 +191,12 @@ def test_expired_job_cannot_be_reopened_without_future_deadline():
 def test_expired_job_rejects_changes_to_job_fields():
     job = make_job("expired")
     db = FakeDatabase(job)
+    bg_tasks = BackgroundTasks()
 
     with pytest.raises(HTTPException) as error:
         jobs.reopen_job(
             str(job.id),
+            bg_tasks,
             JobReopen(
                 deadline=datetime.now(timezone.utc) + timedelta(days=10),
                 title="Otro título",
@@ -196,10 +213,12 @@ def test_reopening_job_with_null_deadline(monkeypatch):
     """Valida que una vacante se pueda reabrir exitosamente sin especificar una fecha límite (deadline=None)."""
     job = make_job("closed")
     db = FakeDatabase(job)
+    bg_tasks = BackgroundTasks()
     monkeypatch.setattr(jobs, "ensure_skills_cached", lambda *_args: None)
 
     result = jobs.reopen_job(
         str(job.id),
+        bg_tasks,
         JobReopen(deadline=None),
         db,
         SimpleNamespace(id="different-recruiter-id", role="recruiter"),
@@ -215,26 +234,24 @@ def test_reopening_job_triggers_email_notification(monkeypatch):
     """Valida que al reabrir una vacante se invoque el servicio de envío de correos a los postulantes."""
     job = make_job("closed")
     db = FakeDatabase(job)
+    bg_tasks = BackgroundTasks()
 
     monkeypatch.setattr(jobs, "ensure_skills_cached", lambda *_args: None)
 
     email_sent_mock = []
 
-    def mock_send_templated_email(db, to_email, template_key, context):
-        email_sent_mock.append(
-            {"to": to_email, "template": template_key, "context": context}
-        )
+    def mock_send_email(to_email, subject, body_text):
+        email_sent_mock.append({"to": to_email, "subject": subject, "body": body_text})
         return True
 
-    # Interceptamos la función de envío de correos en el módulo donde se utiliza
-    monkeypatch.setattr(
-        "app.services.email_service.send_templated_email", mock_send_templated_email
-    )
+    # Interceptamos send_email que es el que ahora ejecuta BackgroundTasks
+    monkeypatch.setattr("app.api.v1.endpoints.jobs.send_email", mock_send_email)
 
     deadline = datetime.now(timezone.utc) + timedelta(days=10)
 
     result = jobs.reopen_job(
         str(job.id),
+        bg_tasks,
         JobReopen(deadline=deadline),
         db,
         SimpleNamespace(id="different-recruiter-id", role="recruiter"),
@@ -242,7 +259,10 @@ def test_reopening_job_triggers_email_notification(monkeypatch):
 
     assert result.status == "active"
     assert db.committed
-    # Validamos que se haya intentado notificar al candidato simulado usando la plantilla correcta
+
+    # Como BackgroundTasks acumula las tareas, podemos ejecutarlas manualmente para verificar el mock
+    for task in bg_tasks.tasks:
+        task.func(*task.args, **task.kwargs)
+
     assert len(email_sent_mock) == 1
     assert email_sent_mock[0]["to"] == "candidato_prueba@example.com"
-    assert email_sent_mock[0]["template"] == "status_update"

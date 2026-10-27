@@ -27,6 +27,8 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 - Consultar el detalle del CV.
 - Descartar candidatos.
 - Envío de correos con actualización de estado de postulaciones o vacantes.
+- Programar entrevista.
+- Contratar (cierra la vacante y avisa a los demás).
 
 ### Reclutador
 - Inicio de sesión.
@@ -43,6 +45,8 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 - Consultar el detalle del CV.
 - Descartar candidatos.
 - Envío de correos con actualización de estado de postulaciones o vacantes.
+- Programar entrevista.
+- Contratar (cierra la vacante y avisa a los demás)
 
 ### Candidato
 - Listar y filtrar vacantes por texto, modalidad y área.
@@ -112,11 +116,11 @@ plurijob/
 │   │   │   ├── application.py
 │   │   │   ├── job.py
 │   │   │   ├── resume.py
-│   │   │   └── users.py
+│   │   │   └── user.py
 │   │   │
 │   │   ├── services/              # Lógica de los motores y algoritmos e IA.
 │   │   │   ├── autostore_job.py		 # Automatización de archivo de vacantes.
-│   │   │   ├── email_service.py		 # Simulación de envio de correos.
+│   │   │   ├── email_service.py		 # Plantillas y envío de correos (SMTP real o simulado).
 │   │   │   ├── gemini_service.py		 # Cliente API Gemini (System Prompt).
 │   │   │   ├── markdown_parser.py		 # Conversión y limpieza del PDF a Markdown.
 │   │   │   ├── matching_engine.py		 # Algoritmo de calculo de match.
@@ -281,8 +285,19 @@ docker exec -it plurijob-api python -m pytest
 Para ejecutar `python -m pytest` desde tu máquina local, asegúrate de haber instalado previamente las dependencias ejecutando `pip install -r backend/requirements.txt` en tu propio entorno virtual.
 
 __
-## Notas para la evaluación:
-- Hasta el 26/10/2026 1:30 am, al ejecutar las pruebas pasaron 78 de 78 sin errores
-- El sistema ya puede enviar correos a los candidatos. Las variantes han sido establecidas en .env.example como comentarios para que quien use el sistema decida si usarlas o probar con la simulación.
 
-- En los archivos subidos a plataforma se incluye una carpeta .zip con captura de pantalla de la interfaz de usuario sometida a revisión de los diferentes elementos y funciones de la página. Puede verse el uso de IA para las funciones para las que fue implementada, y pueden verse las capturas de las simulaciones de envio de correo en diferentes funciones del sistema. También se han subido dos capturas de pantalla por aparte mostrando el correo enviado y recibido.
+## Uso de IA
+Me voy a extender más de lo que pidió:
+* Se usó Copilot Free directamente en Visual Studio Code, y Gemini versión web cuando los creditos a partir del 16/10/2026.
+* En el archivo MVP declaré que hasta el 23 de septiembre me la pasé investigando y anotando ideas. Todo ese tiempo estuve estableciendo la primer versión de lo que sería el funcionamiento del motor de extracción de PDF y el motor de matching que son las partes más complejas y pesadas del sistema; a partir de eso redacté el PRD y el MVP.
+Para empezar a desarrollar el sistema usé primero a Gemini en la web. Como los únicos lenguajes que usé en el proyecto había usado eran HTML, CSS, JS y SQL, no sabía ni que usar. La estructura del arbol de carpetas, las tecnologías a usar y las primeras versiones de los motores se crearon con Gemini en web: yo redacté el pseudocódigo y las reglas de funcionamiento y la IA daba código, yo hacia pequeñas pruebas con los datos del match y los revisaba usando pgAdmin4 para conectarme a la base y veía si faltaba afinar el motor. Como evidencia está en Documentos la bitácora "Conversaciones con la IA": cuando el código se volvió muy grande como para pasarselo a Gemini empecé a discutir primero con ella la estrategia y retomando sus resultados para ordenar a Copilot que creara más código, corrigiera errores que yo todavía no ubicaba por donde salían y refinara los motores.
+* Alrededor del 16/10 comencé a leer el código, comentar las funciones e identificar los pequeños errores de lógica que se escaparon de las reglas iniciales. Estos últimos diez días me he dedicado a conocer mi código, redactar personalmente README y Manual de usuario, y agregar las correciones y adiciones que la plataforma indica apoyandome de la capacidad de programación de la IA y mi comprensión del código para encontrar errores que ni ella podría detectar porque olvida constantemente.
+* Creo que este proyecto es audaz por lo ambicioso que es el alcance del MVP, la inexperiencia en casi todas las tecnologías usadas y el uso de IA de la forma más migajera y controlada que jamás he hecho. Y me divertí.
+
+__
+## Notas para la evaluación:
+- Hasta el 27/10/2026 12:36 am, al ejecutar las pruebas pasaron 86 de 86 sin errores.
+
+- Se eliminó send_template_email de email_service.py y se usó send_email en conjunto con render_template.
+
+- En los archivos subidos a plataforma se incluye una carpeta .zip con captura de pantalla de la interfaz de usuario sometida a revisión de los diferentes elementos y funciones de la página. Puede verse el uso de IA para las funciones para las que fue implementada, y pueden verse las capturas de las simulaciones de envio de correo en diferentes funciones del sistema. También se han subido dos capturas de pantalla por aparte mostrando el correo enviado y recibido. Y una foto de un mural de ideas.

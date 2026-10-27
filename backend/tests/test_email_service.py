@@ -2,6 +2,7 @@ from unittest.mock import patch
 import pytest
 from app.services.email_service import render_template, send_email
 from app.models.email_template import EmailTemplate
+from app.core.config import settings
 
 
 def test_render_template_success(db_session):
@@ -54,8 +55,8 @@ def test_send_email_mock_mode():
     Valida que cuando las credenciales SMTP no están configuradas (modo desarrollo/mock),
     la función de envío imprima en consola de forma segura y devuelva True.
     """
-    with patch("app.services.email_service.SMTP_USER", ""), patch(
-        "app.services.email_service.SMTP_PASSWORD", ""
+    with patch.object(settings, "SMTP_USER", None), patch.object(
+        settings, "SMTP_PASSWORD", None
     ):
 
         result = send_email(
@@ -71,8 +72,8 @@ def test_send_email_smtp_error_handling():
     Valida que si ocurre un fallo crítico de red o excepción SMTP durante el envío real,
     la función lo capture mediante el bloque try-except y devuelva False en lugar de tumbar la API.
     """
-    with patch("app.services.email_service.SMTP_USER", "usuario_smtp"), patch(
-        "app.services.email_service.SMTP_PASSWORD", "password_smtp"
+    with patch.object(settings, "SMTP_USER", "usuario_smtp"), patch.object(
+        settings, "SMTP_PASSWORD", "password_smtp"
     ), patch(
         "smtplib.SMTP",
         side_effect=Exception("Fallo crítico de conexión con el servidor SMTP"),
