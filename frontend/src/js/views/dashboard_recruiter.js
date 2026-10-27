@@ -954,19 +954,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
     `;
 
-    // Configuración dinámica del botón de estado según el estado actual de la postulación
-    let stateBtnText = "Programar Entrevista";
-    let stateBtnClass = "btn-primary";
-    let targetActionState = "interview";
+    // --- REGLA DE VACANTE CERRADA Y ESTADOS DINÁMICOS ---
+    const currentJob = currentJobs.find(
+      (j) => String(j.id) === String(app.job_id),
+    );
+    const isJobClosed = currentJob && currentJob.status === "closed";
 
-    if (app.status === "interview_scheduled") {
-      stateBtnText = "Contratar";
-      stateBtnClass = "btn-success";
-      targetActionState = "hire";
-    } else if (app.status === "hired") {
-      stateBtnText = "Contratado";
-      stateBtnClass = "btn-success disabled";
-      targetActionState = "none";
+    let dynamicActionButtons = "";
+
+    // Si la vacante NO está cerrada, evaluamos los botones según el estado de la postulación
+    if (!isJobClosed) {
+      if (app.status === "application_under_review") {
+        dynamicActionButtons += `
+          <button class="btn btn-sm btn-primary change-state-btn me-1" data-app-id="${app.id}" data-job-id="${app.job_id}" data-next-action="interview">
+            <i class="bi bi-calendar-event"></i> Programar Entrevista
+          </button>
+        `;
+      } else if (app.status === "interview_scheduled") {
+        dynamicActionButtons += `
+          <button class="btn btn-sm btn-success change-state-btn me-1" data-app-id="${app.id}" data-job-id="${app.job_id}" data-next-action="hire">
+            <i class="bi bi-check2-circle"></i> Contratar
+          </button>
+        `;
+      } else if (app.status === "hired") {
+        dynamicActionButtons += `
+          <button class="btn btn-sm btn-success me-1 disabled">
+            <i class="bi bi-check-all"></i> Contratado
+          </button>
+        `;
+        window.location.reload();
+      }
     }
 
     return `
@@ -988,7 +1005,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <i class="bi bi-info-circle"></i> Detalles
               </button>
 
-              <!-- Botón condicional de Sobrecalificación (Sólo aparece si app.is_overqualified es true) -->
+              <!-- Botón condicional de Sobrecalificación -->
               ${
                 app.is_overqualified === true
                   ? `<button class="btn btn-sm btn-warning me-1" type="button" data-bs-toggle="collapse" data-bs-target="#${overqualificationId}" aria-expanded="false" aria-controls="${overqualificationId}">
@@ -997,21 +1014,22 @@ document.addEventListener("DOMContentLoaded", async () => {
                   : ""
               }
 
+              <!-- Botón Ver CV (Siempre disponible) -->
               <button class="btn btn-sm btn-secondary view-cv-btn me-1" data-resume-id="${resume.id || app.resume_id}" data-app-id="${app.id}">
                 <i class="bi bi-file-earmark-text"></i> Ver CV
               </button>
 
-              ${
-                targetActionState !== "none"
-                  ? `<button class="btn btn-sm ${stateBtnClass} change-state-btn me-1" id="changeApplicationState" data-app-id="${app.id}" data-job-id="${app.job_id}" data-next-action="${targetActionState}">
-                       <i class="bi bi-check2-circle"></i> ${stateBtnText}
-                     </button>`
-                  : `<button class="btn btn-sm btn-success me-1 disabled"><i class="bi bi-check-all"></i> Contratado</button>`
-              }
+              <!-- Botón de estado dinámico condicional -->
+              ${dynamicActionButtons}
 
-              <button class="btn btn-sm btn-danger reject-candidate-btn" data-app-id="${app.id}" data-job-id="${app.job_id}">
-                <i class="bi bi-x-circle"></i> Descartar
-              </button>
+              <!-- Botón Descartar (Se oculta automáticamente si la vacante está cerrada) -->
+              ${
+                !isJobClosed
+                  ? `<button class="btn btn-sm btn-danger reject-candidate-btn" data-app-id="${app.id}" data-job-id="${app.job_id}">
+                       <i class="bi bi-x-circle"></i> Descartar
+                     </button>`
+                  : ""
+              }
             </div>
           </div>
         </div>

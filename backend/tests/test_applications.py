@@ -8,7 +8,7 @@ from app.main import app
 
 def get_auth_token_for_user(
     client: TestClient, email: str, role_password: str = "securepassword123"
-    ) -> str:
+) -> str:
     """Registra un usuario y retorna su token JWT de acceso."""
     client.post(
         "/api/v1/auth/register",
@@ -32,7 +32,7 @@ def create_mock_resume_and_job(
     client: TestClient,
     recruiter_token: str,
     candidate_email: str = "candidate@example.com",
-    ):
+):
     """Función de apoyo para crear un CV y una Vacante activa en la BD de pruebas."""
     from app.models.user import User
     from app.models.resume import Resume
@@ -137,6 +137,7 @@ def test_duplicate_application_fails():
     with TestClient(app) as client:
         recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
         email = "candidate@example.com"
+        candidate_token = get_auth_token_for_user(client, email)
         resume_id, job_id = create_mock_resume_and_job(client, recruiter_token, email)
 
         payload = {
@@ -148,10 +149,18 @@ def test_duplicate_application_fails():
             "app.api.v1.endpoints.applications.recalculate_application_match",
             return_value=None,
         ):
-            res1 = client.post(f"/api/v1/jobs/{job_id}/applications", json=payload)
+            res1 = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {candidate_token}"},
+                json=payload,
+            )
             assert res1.status_code == 201
 
-            res2 = client.post(f"/api/v1/jobs/{job_id}/applications", json=payload)
+            res2 = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {candidate_token}"},
+                json=payload,
+            )
             assert res2.status_code == 409
             assert "Ya existe una postulación" in res2.json()["detail"]
 
@@ -163,12 +172,10 @@ def test_max_applications_limit_fails():
         candidate_email = "candidate@example.com"
         candidate_token = get_auth_token_for_user(client, candidate_email)
 
-        # Crear 1 solo CV y 4 vacantes distintas para probar el límite
         resume_id, job_id_1 = create_mock_resume_and_job(
             client, recruiter_token, candidate_email
         )
 
-        # Necesitamos crear otras 3 vacantes adicionales
         future_deadline = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
         job_ids = [job_id_1]
 
@@ -197,7 +204,6 @@ def test_max_applications_limit_fails():
             "app.api.v1.endpoints.applications.recalculate_application_match",
             return_value=None,
         ):
-            # Realizar las primeras 3 postulaciones exitosas
             for j_id in job_ids[:3]:
                 res = client.post(
                     f"/api/v1/jobs/{j_id}/applications",
@@ -206,7 +212,6 @@ def test_max_applications_limit_fails():
                 )
                 assert res.status_code == 201
 
-            # Intentar la cuarta postulación (debe ser rechazada con código 400)
             fourth_res = client.post(
                 f"/api/v1/jobs/{job_ids[3]}/applications",
                 headers={"Authorization": f"Bearer {candidate_token}"},
@@ -239,7 +244,6 @@ def test_cancel_application_by_owner_success():
             )
         application_id = app_res.json()["id"]
 
-        # Cancelación hecha por el dueño (200 OK)
         cancel_res = client.delete(
             f"/api/v1/applications/{application_id}",
             headers={"Authorization": f"Bearer {candidate_token}"},
@@ -271,10 +275,8 @@ def test_cancel_application_by_another_user_forbidden():
             )
         application_id = app_res.json()["id"]
 
-        # Crear y autenticar a otro usuario distinto
         other_user_token = get_auth_token_for_user(client, "other@example.com")
 
-        # Intentar cancelar la postulación ajena
         cancel_res = client.delete(
             f"/api/v1/applications/{application_id}",
             headers={"Authorization": f"Bearer {other_user_token}"},
@@ -324,6 +326,7 @@ def test_recruiter_lists_and_rejects_application():
     with TestClient(app) as client:
         recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
         candidate_email = "candidate@example.com"
+        candidate_token = get_auth_token_for_user(client, candidate_email)
         resume_id, job_id = create_mock_resume_and_job(
             client, recruiter_token, candidate_email
         )
@@ -334,6 +337,7 @@ def test_recruiter_lists_and_rejects_application():
         ):
             create_app_res = client.post(
                 f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {candidate_token}"},
                 json={"resume_id": resume_id, "candidate_email": candidate_email},
             )
         application_id = create_app_res.json()["id"]
@@ -358,3 +362,251 @@ def test_recruiter_lists_and_rejects_application():
         assert data["candidate_email"] == candidate_email
         assert data["rejection_reason"] is not None
         assert "eliminada correctamente" in data["message"]
+
+
+# =========================================================================
+# PRUEBAS: MÁQUINA DE ESTADOS ESTRICTA, ROLES Y BLOQUEO DE VACANTES
+# =========================================================================
+
+
+def test_application_strict_state_machine_workflow():
+    """Valida el ciclo de estados completo: received -> under_review -> interview_scheduled -> hired."""
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
+        candidate_email = "candidate@example.com"
+        candidate_token = get_auth_token_for_user(client, candidate_email)
+        resume_id, job_id = create_mock_resume_and_job(
+            client, recruiter_token, candidate_email
+        )
+
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            app_res = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {candidate_token}"},
+                json={"resume_id": resume_id, "candidate_email": candidate_email},
+            )
+        app_id = app_res.json()["id"]
+        assert app_res.json()["status"] == "application_received"
+
+        # 1. Pasar a review (view)
+        view_res = client.patch(
+            f"/api/v1/applications/{app_id}/view",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert view_res.status_code == 200
+        assert view_res.json()["status"] == "application_under_review"
+
+        # 2. Pasar a interview
+        interview_res = client.patch(
+            f"/api/v1/applications/{app_id}/interview",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert interview_res.status_code == 200
+        assert interview_res.json()["status"] == "interview_scheduled"
+
+        # 3. Contratar (hire) - Cierra la vacante automáticamente
+        hire_res = client.patch(
+            f"/api/v1/applications/{app_id}/hire",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert hire_res.status_code == 200
+        assert hire_res.json()["status"] == "hired"
+
+
+def test_invalid_state_transition_fails():
+    """Valida que intentar saltarse estados (ej. pasar directo a interview desde received) devuelva 409 Conflict."""
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
+        candidate_email = "candidate@example.com"
+        candidate_token = get_auth_token_for_user(client, candidate_email)
+        resume_id, job_id = create_mock_resume_and_job(
+            client, recruiter_token, candidate_email
+        )
+
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            app_res = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {candidate_token}"},
+                json={"resume_id": resume_id, "candidate_email": candidate_email},
+            )
+        app_id = app_res.json()["id"]
+
+        # Intentar programar entrevista estando en 'application_received' (debe fallar con 409)
+        bad_transition = client.patch(
+            f"/api/v1/applications/{app_id}/interview",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert bad_transition.status_code == 409
+        assert (
+            "debe encontrarse en estado 'application_under_review'"
+            in bad_transition.json()["detail"]
+        )
+
+
+def test_unauthorized_role_changes_status_forbidden():
+    """Valida que un usuario candidato no pueda alterar estados de postulaciones (403 Forbidden)."""
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
+        candidate_email = "candidate@example.com"
+        candidate_token = get_auth_token_for_user(client, candidate_email)
+
+        resume_id, job_id = create_mock_resume_and_job(
+            client, recruiter_token, candidate_email
+        )
+
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            app_res = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {candidate_token}"},
+                json={"resume_id": resume_id, "candidate_email": candidate_email},
+            )
+        app_id = app_res.json()["id"]
+
+        # Candidato intenta marcar como visto (debe fallar con 403)
+        res = client.patch(
+            f"/api/v1/applications/{app_id}/view",
+            headers={"Authorization": f"Bearer {candidate_token}"},
+        )
+        assert res.status_code == 403
+
+
+def test_closed_job_blocks_application_modifications():
+    """Valida que si la vacante está cerrada, cualquier cambio de estado o descarte arroje error 409."""
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
+        candidate_email = "candidate@example.com"
+        candidate_token = get_auth_token_for_user(client, candidate_email)
+        resume_id, job_id = create_mock_resume_and_job(
+            client, recruiter_token, candidate_email
+        )
+
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            app_res = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {candidate_token}"},
+                json={"resume_id": resume_id, "candidate_email": candidate_email},
+            )
+        app_id = app_res.json()["id"]
+
+        # Cerrar la vacante explícitamente
+        close_res = client.patch(
+            f"/api/v1/jobs/{job_id}/close",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert close_res.status_code == 200
+
+        # Intentar ver/marcar revisión con la vacante cerrada (debe dar 409)
+        view_res = client.patch(
+            f"/api/v1/applications/{app_id}/view",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert view_res.status_code == 409
+        assert "vacante cerrada o archivada" in view_res.json()["detail"]
+
+        # Intentar descartar con la vacante cerrada (debe dar 409)
+        reject_res = client.patch(
+            f"/api/v1/applications/{app_id}/reject",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+            json={"rejection_reason": "Fuera de tiempo"},
+        )
+        assert reject_res.status_code == 409
+        assert "vacante cerrada o archivada" in reject_res.json()["detail"]
+
+
+def test_hire_single_candidate_constraint():
+    """Valida que no se pueda contratar a más de un candidato por vacante (409 Conflict)."""
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
+
+        # Candidato 1
+        cand1_email = "cand1@example.com"
+        cand1_token = get_auth_token_for_user(client, cand1_email)
+        resume1_id, job_id = create_mock_resume_and_job(
+            client, recruiter_token, cand1_email
+        )
+
+        # Candidato 2
+        cand2_email = "cand2@example.com"
+        cand2_token = get_auth_token_for_user(client, cand2_email)
+
+        db = SessionLocal()
+        try:
+            from app.models.user import User
+            from app.models.resume import Resume
+
+            user2 = db.query(User).filter(User.email == cand2_email).first()
+            resume2 = Resume(
+                candidate_email=cand2_email,
+                parsed_data={
+                    "professional_title": "Dev",
+                    "technical_skills": ["Python"],
+                },
+                user_id=user2.id if user2 else None,
+            )
+            db.add(resume2)
+            db.commit()
+            db.refresh(resume2)
+            resume2_id = str(resume2.id)
+        finally:
+            db.close()
+
+        # Postular candidato 1
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            res1 = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {cand1_token}"},
+                json={"resume_id": resume1_id, "candidate_email": cand1_email},
+            )
+            assert res1.status_code == 201
+            app_id_1 = res1.json()["id"]
+
+        # Postular candidato 2
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            res2 = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {cand2_token}"},
+                json={"resume_id": resume2_id, "candidate_email": cand2_email},
+            )
+            assert res2.status_code == 201
+            app_id_2 = res2.json()["id"]
+
+        # Contratar al candidato 1
+        client.patch(
+            f"/api/v1/applications/{app_id_1}/view",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        client.patch(
+            f"/api/v1/applications/{app_id_1}/interview",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        hire_1 = client.patch(
+            f"/api/v1/applications/{app_id_1}/hire",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert hire_1.status_code == 200, hire_1.text
+
+        # Intentar interactuar con el candidato 2 (la vacante se cerró al contratar al 1, debe arrojar 409)
+        view_2 = client.patch(
+            f"/api/v1/applications/{app_id_2}/view",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert view_2.status_code == 409
+        assert "vacante cerrada o archivada" in view_2.json()["detail"]

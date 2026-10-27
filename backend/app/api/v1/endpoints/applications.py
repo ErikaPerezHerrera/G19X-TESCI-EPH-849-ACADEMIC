@@ -27,14 +27,32 @@ from app.services.email_service import send_templated_email
 router = APIRouter(prefix="", tags=["applications"])
 
 
-## --- RUTAS ESPECÍFICAS DE CANDIDATO (Primero las fijas) ---
+def _validate_recruiter_or_admin(current_user: User):
+    """Valida que el usuario tenga rol de reclutador o administrador."""
+    if current_user.role not in ("recruiter", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. Se requiere rol de reclutador o administrador.",
+        )
+
+
+def _validate_job_active_for_applications(job: Job):
+    """Bloquea cambios si la vacante está cerrada o archivada (409 Conflict)."""
+    if job and job.status in ("closed", "stored"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se pueden realizar cambios de estado en postulaciones de una vacante cerrada o archivada.",
+        )
+
+
+## --- RUTAS ESPECÍfICAS DE CANDIDATO (Primero las fijas) ---
 
 
 ## Ruta para listar postulaciones del usuario autenticado
 @router.get("/applications/me", response_model=list[ApplicationOut])
 def list_my_applications(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-    ):
+):
     return (
         db.query(Application)
         .options(joinedload(Application.job))
@@ -54,7 +72,7 @@ def create_application(
     payload: ApplicationCreate,
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
-    ):
+):
     if current_user is not None and current_user.role not in ("registered", "casual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -78,6 +96,7 @@ def create_application(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="El plazo para postularse a esta vacante ha vencido.",
             )
+
     # Validar si ya existe una postulación previa para esta vacante con este correo
     existing_application = (
         db.query(Application)
@@ -127,22 +146,6 @@ def create_application(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Has alcanzado el límite máximo de 3 postulaciones activas simultáneas.",
-        )
-
-    existing_application = (
-        db.query(Application)
-        .filter(
-            Application.id
-            == job.id,  # Ojo con esto, mantenemos tu lógica original de job_id
-            Application.job_id == job.id,
-            func.lower(Application.candidate_email) == candidate_email,
-        )
-        .first()
-    )
-    if existing_application:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe una postulación para esta vacante y este correo.",
         )
 
     parsed_data = resume.parsed_data or {}
@@ -198,6 +201,7 @@ def create_application(
 
     return application
 
+
 ## Ruta para que el candidato cancele su postulación
 @router.delete("/applications/{application_id}", status_code=status.HTTP_200_OK)
 def cancel_application(
@@ -210,6 +214,9 @@ def cancel_application(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="La postulación no existe."
         )
+
+    job = db.query(Job).filter(Job.id == application.job_id).first()
+    _validate_job_active_for_applications(job)
 
     is_owner = False
     if application.user_id and str(application.user_id) == str(current_user.id):
@@ -226,12 +233,9 @@ def cancel_application(
             detail="No tienes permiso para cancelar esta postulación.",
         )
 
-    # 1. Guardar datos clave antes de eliminar
     candidate_email = application.candidate_email
-    job = db.query(Job).filter(Job.id == application.job_id).first()
     job_title = job.title if job else "la vacante"
 
-    # 2. Enviar correo usando la plantilla 'status_update'
     send_templated_email(
         db,
         to_email=candidate_email,
@@ -243,7 +247,6 @@ def cancel_application(
         },
     )
 
-    # 3. Eliminar la postulación
     db.delete(application)
     db.commit()
 
@@ -259,7 +262,8 @@ def list_job_applications(
     job_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-    ):
+):
+    _validate_recruiter_or_admin(current_user)
     return (
         db.query(Application)
         .options(joinedload(Application.resume))
@@ -268,33 +272,44 @@ def list_job_applications(
         .all()
     )
 
+
 ## Ruta para marcar CV como visto (application_under_review)
 @router.patch("/applications/{application_id}/view", response_model=ApplicationOut)
 def mark_application_as_viewed(
     application_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-    ):
+):
+    _validate_recruiter_or_admin(current_user)
+
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Postulación no encontrada.")
 
-    initial_states = ["received", "application_received"]
-    if application.status in initial_states:
-        application.status = "application_under_review"
-        db.commit()
-        db.refresh(application)
+    job = db.query(Job).filter(Job.id == application.job_id).first()
+    _validate_job_active_for_applications(job)
 
-        job = db.query(Job).filter(Job.id == application.job_id).first()
-        send_templated_email(
-            db,
-            to_email=application.candidate_email,
-            template_key="application_under_review",
-            context={
-                "candidate_name": application.candidate_email.split("@")[0],
-                "job_title": job.title if job else "la vacante",
-            },
+    # Transición estricta: solo desde application_received (o received)
+    valid_previous_states = ["received", "application_received"]
+    if application.status not in valid_previous_states:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La postulación debe encontrarse en estado 'application_received' para pasar a revisión.",
         )
+
+    application.status = "application_under_review"
+    db.commit()
+    db.refresh(application)
+
+    send_templated_email(
+        db,
+        to_email=application.candidate_email,
+        template_key="application_under_review",
+        context={
+            "candidate_name": application.candidate_email.split("@")[0],
+            "job_title": job.title if job else "la vacante",
+        },
+    )
 
     return application
 
@@ -305,16 +320,27 @@ def schedule_interview_application(
     application_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-    ):
+):
+    _validate_recruiter_or_admin(current_user)
+
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Postulación no encontrada.")
+
+    job = db.query(Job).filter(Job.id == application.job_id).first()
+    _validate_job_active_for_applications(job)
+
+    # Transición estricta: solo desde application_under_review
+    if application.status != "application_under_review":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La postulación debe encontrarse en estado 'application_under_review' para programar una entrevista.",
+        )
 
     application.status = "interview_scheduled"
     db.commit()
     db.refresh(application)
 
-    job = db.query(Job).filter(Job.id == application.job_id).first()
     send_templated_email(
         db,
         to_email=application.candidate_email,
@@ -333,14 +359,41 @@ def hire_application(
     application_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-    ):
+):
+    _validate_recruiter_or_admin(current_user)
+
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Postulación no encontrada.")
 
+    job = db.query(Job).filter(Job.id == application.job_id).first()
+    _validate_job_active_for_applications(job)
+
+    # Transición estricta: solo desde interview_scheduled
+    if application.status != "interview_scheduled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La postulación debe encontrarse en estado 'interview_scheduled' para poder contratar al candidato.",
+        )
+
+    # Restricción: hired solo puede aplicarse a un postulado a la vez por vacante
+    existing_hired = (
+        db.query(Application)
+        .filter(
+            Application.job_id == application.job_id,
+            Application.status == "hired",
+            Application.id != application.id,
+        )
+        .first()
+    )
+    if existing_hired:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un candidato contratado para esta vacante.",
+        )
+
     application.status = "hired"
 
-    job = db.query(Job).filter(Job.id == application.job_id).first()
     if job:
         job.status = "closed"
 
@@ -389,6 +442,8 @@ def reject_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
 ):
+    _validate_recruiter_or_admin(current_user)
+
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(
@@ -397,9 +452,10 @@ def reject_application(
         )
 
     job = db.query(Job).filter(Job.id == application.job_id).first()
+    _validate_job_active_for_applications(job)
+
     candidate_email = application.candidate_email
 
-    # Si hay razón, la formateamos con su punto y prefijo; si no, queda totalmente vacía
     rejection_reason = (
         f" Motivo del descarte: {payload.rejection_reason}."
         if payload.rejection_reason
