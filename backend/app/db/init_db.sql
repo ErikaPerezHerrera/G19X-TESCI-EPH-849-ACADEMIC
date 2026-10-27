@@ -330,7 +330,7 @@ VALUES
     (
         'application_rejected',
         'Actualización de tu postulación',
-        'Hola {{candidate_name}}, gracias por tu interés. Después de revisar tu perfil, en esta ocasión no continuaremos con tu postulación para {{job_title}}.',
+        'Hola {{candidate_name}}, gracias por tu interés. Después de revisar tu perfil, en esta ocasión no continuaremos con tu postulación para {{job_title}}{{rejection_reason}}',
         TRUE
     ),
     (

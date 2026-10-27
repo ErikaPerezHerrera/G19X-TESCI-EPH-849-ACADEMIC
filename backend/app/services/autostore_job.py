@@ -36,6 +36,7 @@ def auto_archive_expired_closed_jobs(db: Session):
                 context={
                     "candidate_name": app.candidate_email.split("@")[0],
                     "job_title": job.title,
+                    "message": "Te informamos que la vacante ha sido archivada tras cumplirse el periodo de tiempo establecido, por lo que este proceso ha concluido.",
                 },
             )
 

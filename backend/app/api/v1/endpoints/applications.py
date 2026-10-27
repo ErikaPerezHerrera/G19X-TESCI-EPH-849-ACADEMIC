@@ -388,7 +388,7 @@ def reject_application(
     payload: ApplicationReject,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_recruiter),
-    ):
+):
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(
@@ -399,8 +399,9 @@ def reject_application(
     job = db.query(Job).filter(Job.id == application.job_id).first()
     candidate_email = application.candidate_email
 
+    # Si hay razón, la formateamos con su punto y prefijo; si no, queda totalmente vacía
     rejection_reason = (
-        f"\nMotivo del descarte: {payload.rejection_reason}"
+        f" Motivo del descarte: {payload.rejection_reason}."
         if payload.rejection_reason
         else ""
     )
@@ -429,5 +430,5 @@ def reject_application(
     return {
         "message": "Postulación rechazada y eliminada correctamente.",
         "candidate_email": candidate_email,
-        "rejection_reason": rejection_reason,
+        "rejection_reason": payload.rejection_reason,
     }

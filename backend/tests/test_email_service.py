@@ -51,40 +51,6 @@ def test_render_template_fallback(db_session):
 
 def test_send_email_mock_mode():
     """
-    Valida que cuando las credenciales SMTP no están configuradas,
-    la función de envío imprima en consola de forma segura y devuelva True.
-    """
-    with patch("app.services.email_service.SMTP_USER", ""), patch(
-        "app.services.email_service.SMTP_PASSWORD", ""
-    ):
-
-        result = send_email(
-            to_email="candidato@example.com",
-            subject="Prueba Mock",
-            body_text="Este es un correo de prueba simulado.",
-        )
-        assert result is True
-
-
-def test_send_email_smtp_error_handling():
-    """
-    Valida que si ocurre un fallo crítico de red, la función lo capture
-    mediante el bloque try-except y devuelva False.
-    """
-    with patch("app.services.email_service.SMTP_USER", "usuario_smtp"), patch(
-        "app.services.email_service.SMTP_PASSWORD", "password_smtp"
-    ), patch("smtplib.SMTP", side_effect=Exception("Fallo crítico de conexión")):
-
-        result = send_email(
-            to_email="candidato@example.com",
-            subject="Prueba Error",
-            body_text="Este correo fallará intencionalmente.",
-        )
-        assert result is False
-
-
-def test_send_email_mock_mode():
-    """
     Valida que cuando las credenciales SMTP no están configuradas (modo desarrollo/mock),
     la función de envío imprima en consola de forma segura y devuelva True.
     """
@@ -118,3 +84,19 @@ def test_send_email_smtp_error_handling():
             body_text="Este correo fallará intencionalmente.",
         )
         assert result is False
+
+
+def test_render_template_removes_missing_placeholders(db_session):
+    db_session.add(
+        EmailTemplate(
+            template_key="status_update",
+            subject="Actualización",
+            body_text="Hola {{candidate_name}}. {{message}}",
+        )
+    )
+    db_session.commit()
+
+    _, body = render_template(db_session, "status_update", {"candidate_name": "Ana"})
+
+    assert "{{" not in body
+    assert "Ana" in body

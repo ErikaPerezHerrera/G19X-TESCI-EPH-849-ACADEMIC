@@ -956,12 +956,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Configuración dinámica del botón de estado según el estado actual de la postulación
     let stateBtnText = "Programar Entrevista";
-    let stateBtnClass = "btn-outline-primary";
+    let stateBtnClass = "btn-primary";
     let targetActionState = "interview";
 
     if (app.status === "interview_scheduled") {
       stateBtnText = "Contratar";
-      stateBtnClass = "btn-outline-success";
+      stateBtnClass = "btn-success";
       targetActionState = "hire";
     } else if (app.status === "hired") {
       stateBtnText = "Contratado";
@@ -984,20 +984,20 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
             <div class="col-md-5 text-md-end mt-3 mt-md-0">
               <!-- Botón Detalles del Match -->
-              <button class="btn btn-sm btn-outline-info me-1" type="button" data-bs-toggle="collapse" data-bs-target="#${detailsId}" aria-expanded="false" aria-controls="${detailsId}">
+              <button class="btn btn-sm btn-info me-1" type="button" data-bs-toggle="collapse" data-bs-target="#${detailsId}" aria-expanded="false" aria-controls="${detailsId}">
                 <i class="bi bi-info-circle"></i> Detalles
               </button>
 
               <!-- Botón condicional de Sobrecalificación (Sólo aparece si app.is_overqualified es true) -->
               ${
                 app.is_overqualified === true
-                  ? `<button class="btn btn-sm btn-outline-warning me-1" type="button" data-bs-toggle="collapse" data-bs-target="#${overqualificationId}" aria-expanded="false" aria-controls="${overqualificationId}">
+                  ? `<button class="btn btn-sm btn-warning me-1" type="button" data-bs-toggle="collapse" data-bs-target="#${overqualificationId}" aria-expanded="false" aria-controls="${overqualificationId}">
                        <i class="bi bi-exclamation-triangle"></i> Sobrecalificado
                      </button>`
                   : ""
               }
 
-              <button class="btn btn-sm btn-outline-secondary view-cv-btn me-1" data-resume-id="${resume.id || app.resume_id}" data-app-id="${app.id}">
+              <button class="btn btn-sm btn-secondary view-cv-btn me-1" data-resume-id="${resume.id || app.resume_id}" data-app-id="${app.id}">
                 <i class="bi bi-file-earmark-text"></i> Ver CV
               </button>
 
@@ -1009,7 +1009,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   : `<button class="btn btn-sm btn-success me-1 disabled"><i class="bi bi-check-all"></i> Contratado</button>`
               }
 
-              <button class="btn btn-sm btn-outline-danger reject-candidate-btn" data-app-id="${app.id}" data-job-id="${app.job_id}">
+              <button class="btn btn-sm btn-danger reject-candidate-btn" data-app-id="${app.id}" data-job-id="${app.job_id}">
                 <i class="bi bi-x-circle"></i> Descartar
               </button>
             </div>

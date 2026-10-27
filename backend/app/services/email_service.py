@@ -58,12 +58,18 @@ def render_template(db: Session, template_key: str, context: dict) -> tuple[str,
         subject = template.subject
         body = template.body_text
 
-    # Reemplazo seguro de variables estilo {{variable_name}}
+    # 1. Reemplazamos todas las variables que SÍ vienen en el contexto
     for key, value in context.items():
         placeholder = f"{{{{{key}}}}}"
         safe_value = str(value) if value is not None else ""
         subject = subject.replace(placeholder, safe_value)
         body = body.replace(placeholder, safe_value)
+
+    # 2. Limpieza defensiva FUERA del bucle:
+    # Cualquier variable opcional que no se mandó en el contexto (como {{rejection_reason}} o {{message}})
+    # se borra limpiamente en lugar de dejar el texto con llaves feas.
+    body = re.sub(r"\{\{.*?\}\}", "", body)
+    subject = re.sub(r"\{\{.*?\}\}", "", subject)
 
     return subject, body
 
