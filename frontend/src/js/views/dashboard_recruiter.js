@@ -982,7 +982,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             <i class="bi bi-check-all"></i> Contratado
           </button>
         `;
-        window.location.reload();
       }
     }
 

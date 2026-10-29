@@ -610,3 +610,151 @@ def test_hire_single_candidate_constraint():
         )
         assert view_2.status_code == 409
         assert "vacante cerrada o archivada" in view_2.json()["detail"]
+
+
+def test_hire_same_candidate_twice_fails():
+    """Valida que intentar contratar a un candidato que ya fue contratado o reintentar el endpoint de contratación devuelva un error 409 Conflict."""
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
+        candidate_email = "candidate@example.com"
+        candidate_token = get_auth_token_for_user(client, candidate_email)
+        resume_id, job_id = create_mock_resume_and_job(
+            client, recruiter_token, candidate_email
+        )
+
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            app_res = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {candidate_token}"},
+                json={"resume_id": resume_id, "candidate_email": candidate_email},
+            )
+        app_id = app_res.json()["id"]
+
+        # 1. Llevar la postulación por el flujo estricto hasta 'hired'
+        client.patch(
+            f"/api/v1/applications/{app_id}/view",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        client.patch(
+            f"/api/v1/applications/{app_id}/interview",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        first_hire = client.patch(
+            f"/api/v1/applications/{app_id}/hire",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        assert first_hire.status_code == 200
+        assert first_hire.json()["status"] == "hired"
+
+        # 2. Intentar contratar al mismo candidato por segunda vez (o con la vacante ya cerrada)
+        second_hire = client.patch(
+            f"/api/v1/applications/{app_id}/hire",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+
+        # Debe fallar con 409 Conflict (ya sea por restricción de estado o por estar la vacante cerrada/archivada)
+        assert second_hire.status_code == 409
+
+
+def test_hire_application_queues_emails_for_all_candidates():
+    """Valida que al contratar a un candidato, se encoluen y disparen los correos tanto para el candidato contratado como para los demás postulantes de la vacante."""
+    with TestClient(app) as client:
+        recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
+
+        # Candidato 1 (El que será contratado)
+        cand1_email = "cand1@example.com"
+        cand1_token = get_auth_token_for_user(client, cand1_email)
+        resume1_id, job_id = create_mock_resume_and_job(
+            client, recruiter_token, cand1_email
+        )
+
+        # Candidato 2 (El que recibirá el correo de vacante cerrada)
+        cand2_email = "cand2@example.com"
+        cand2_token = get_auth_token_for_user(client, cand2_email)
+
+        db = SessionLocal()
+        try:
+            from app.models.user import User
+            from app.models.resume import Resume
+
+            user2 = db.query(User).filter(User.email == cand2_email).first()
+            resume2 = Resume(
+                candidate_email=cand2_email,
+                parsed_data={
+                    "professional_title": "Dev",
+                    "technical_skills": ["Python"],
+                },
+                user_id=user2.id if user2 else None,
+            )
+            db.add(resume2)
+            db.commit()
+            db.refresh(resume2)
+            resume2_id = str(resume2.id)
+        finally:
+            db.close()
+
+        # Postular candidato 1
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            res1 = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {cand1_token}"},
+                json={"resume_id": resume1_id, "candidate_email": cand1_email},
+            )
+            assert res1.status_code == 201
+            app_id_1 = res1.json()["id"]
+
+        # Postular candidato 2
+        with patch(
+            "app.api.v1.endpoints.applications.recalculate_application_match",
+            return_value=None,
+        ):
+            res2 = client.post(
+                f"/api/v1/jobs/{job_id}/applications",
+                headers={"Authorization": f"Bearer {cand2_token}"},
+                json={"resume_id": resume2_id, "candidate_email": cand2_email},
+            )
+            assert res2.status_code == 201
+
+        # Llevar al candidato 1 al estado 'interview_scheduled'
+        client.patch(
+            f"/api/v1/applications/{app_id_1}/view",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+        client.patch(
+            f"/api/v1/applications/{app_id_1}/interview",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+        )
+
+        # Parchear send_email para capturar los correos encolados
+        sent_emails = []
+
+        def mock_send_email(to_email, subject, body_text):
+            sent_emails.append({"to": to_email, "subject": subject, "body": body_text})
+            return True
+
+        with patch(
+            "app.api.v1.endpoints.applications.send_email", side_effect=mock_send_email
+        ):
+            # Contratar al candidato 1 (esto dispara el cierre de vacante y notificación a ambos)
+            hire_res = client.patch(
+                f"/api/v1/applications/{app_id_1}/hire",
+                headers={"Authorization": f"Bearer {recruiter_token}"},
+            )
+            assert hire_res.status_code == 200, hire_res.text
+
+        # Como TestClient ejecuta BackgroundTasks, verificamos los correos capturados
+        # (Si TestClient no los ejecuta automáticamente según la versión, puedes forzar el consumo de la cola de app si aplica,
+        # pero con el patch directo a send_email ejecutado por TestClient al finalizar la petición, bastará).
+
+        recipients = [email["to"] for email in sent_emails]
+
+        # Comprobamos que se hayan encolado/enviado los dos correos (cand1 y cand2)
+        assert len(sent_emails) == 2
+        assert cand1_email in recipients
+        assert cand2_email in recipients

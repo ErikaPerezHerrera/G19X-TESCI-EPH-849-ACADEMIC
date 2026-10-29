@@ -12,21 +12,18 @@ from sqlalchemy.orm import sessionmaker
 
 from app.main import app
 from app.core.config import settings
-from app.core.database import get_db, Base,engine
+from app.core.database import get_db, Base, engine
 from app.core import database
 
 # 2. Obtener o construir la URL de la base de datos de forma segura
-# (Busca si existe DATABASE_URL, SQLALCHEMY_DATABASE_URI o la construye por partes)
 base_url = getattr(settings, "DATABASE_URL", None) or getattr(
     settings, "SQLALCHEMY_DATABASE_URI", None
 )
 
 if base_url:
-    # Si existe, solo reemplazamos el nombre de la base de datos por la de pruebas
     default_db = getattr(settings, "POSTGRES_DB", "plurijob")
     TEST_DATABASE_URL = str(base_url).replace(default_db, TEST_DB_NAME)
 else:
-    # Si no existe como atributo directo, la armamos con los datos individuales de settings o defaults
     db_user = getattr(settings, "POSTGRES_USER", "postgres")
     db_password = getattr(settings, "POSTGRES_PASSWORD", "postgres")
     db_server = getattr(settings, "POSTGRES_SERVER", "localhost")
@@ -41,6 +38,13 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 # Sobrescribir SessionLocal globalmente para que las funciones auxiliares usen la BD de prueba
 database.SessionLocal = TestingSessionLocal
+
+
+@pytest.fixture(autouse=True)
+def email_simulado(monkeypatch):
+    """Ninguna prueba debe mandar correos reales."""
+    monkeypatch.setattr(settings, "SMTP_USER", None)
+    monkeypatch.setattr(settings, "SMTP_PASSWORD", None)
 
 
 @pytest.fixture(autouse=True)

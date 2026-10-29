@@ -245,8 +245,7 @@ Se trata de la eliminación directa de la postulación del candidato. Siguiendo 
 
 ___
 ### Reabrir vacante
-Al pulsar el botón **"Reabrir"** sobre una vacante, todos los datos de la vacante serán mostrados en el formulario de "Publicar vacante"/`publish.html`. En este caso no se podrá editar la información de la vacante, sólo se permite seleccionar una fecha de vencimiento (opcional). Al presionar el botón **"Guardar y Reabrir"** la vacante cambia su estado a Activa y ahora puede verse en el selector de vacantes activas y en el panel de búsqueda de vacantes al que Usuario Casual y Usuario Registrado pueden acceder. Se enviará un correo notificatorio a los candidatos para que estén pendientes de su proceso de selección.
-
+Al pulsar el botón **"Reabrir"** sobre una vacante, todos los datos de la vacante serán mostrados en el formulario de "Publicar vacante"/`publish.html`. En este caso no se podrá editar la información de la vacante, sólo se permite seleccionar una fecha de vencimiento (opcional). Al presionar el botón **"Guardar y Reabrir"** la vacante cambia su estado a Activa y ahora puede verse en el selector de vacantes activas y en el panel de búsqueda de vacantes al que Usuario Casual y Usuario Registrado pueden acceder. Se enviará un correo notificatorio a los candidatos para que estén pendientes de su proceso de selección. Si entre los postulados a la vacante había uno contratado, lo elimina de los postulados y se le notifica que su periodo de prueba en la empresa ha concluido.
 ____
 ### Cerrar Vacante
 Si se pulsa el botón **"Cerrar"** sobre una vacante abierta/vencida se pide una confirmación. Al aceptar, el estado de la vacante pasará a "Cerrada" y podrá visualizarse desde la sección de vacantes cerradas. Se enviará un correo notificatorio a los usuarios, informando que en 30 días o menos su postulación será eliminada.

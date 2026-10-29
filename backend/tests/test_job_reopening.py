@@ -10,18 +10,24 @@ from app.schemas.job import JobReopen
 
 
 class FakeQuery:
-    def __init__(self, value, model=None):
+    def __init__(self, value, model=None, filter_conditions=None):
         self.value = value
         self.model = model
+        self.filter_conditions = filter_conditions or []
 
-    def filter(self, *_conditions):
-        return self
+    def filter(self, *conditions):
+        return FakeQuery(
+            self.value,
+            model=self.model,
+            filter_conditions=self.filter_conditions + list(conditions),
+        )
 
     def options(self, *_options):
         return self
 
     def first(self):
         from app.models.email_template import EmailTemplate
+        from app.models.application import Application
 
         if self.model == EmailTemplate:
             return SimpleNamespace(
@@ -29,14 +35,32 @@ class FakeQuery:
                 subject="Actualización de vacante: {{job_title}}",
                 body_text="Hola {{candidate_name}}, la vacante {{job_title}} ha sido actualizada. {{message}}",
             )
+        if self.model == Application:
+            # Si se está buscando un candidato con status="hired"
+            for cond in self.filter_conditions:
+                # Comprobación segura para identificar si el filtro busca hired
+                if "hired" in str(cond):
+                    return SimpleNamespace(
+                        id=uuid4(),
+                        job_id=self.value.id if hasattr(self.value, "id") else uuid4(),
+                        status="hired",
+                        candidate_email="contratado@example.com",
+                    )
+            return None
         return self.value
 
     def all(self):
         from app.models.application import Application
 
         if self.model == Application:
-            # Retornar una lista con postulaciones simuladas para que el bucle de correo funcione
-            return [SimpleNamespace(candidate_email="candidato_prueba@example.com")]
+            # Retornar una lista con postulaciones simuladas que tengan candidate_email
+            return [
+                SimpleNamespace(
+                    id=uuid4(),
+                    candidate_email="candidato_prueba@example.com",
+                    status="applied",
+                )
+            ]
         return [self.value] if self.value else []
 
     def delete(self, synchronize_session=False):
@@ -44,10 +68,12 @@ class FakeQuery:
 
 
 class FakeDatabase:
-    def __init__(self, job):
+    def __init__(self, job, has_hired_application=False):
         self.job = job
+        self.has_hired_application = has_hired_application
         self.committed = False
         self.rolled_back = False
+        self.deleted_instances = []
 
     def query(self, model):
         from app.models.email_template import EmailTemplate
@@ -58,6 +84,9 @@ class FakeDatabase:
         if model == Application:
             return FakeQuery(self.job, model=Application)
         return FakeQuery(self.job, model=model)
+
+    def delete(self, instance):
+        self.deleted_instances.append(instance)
 
     def commit(self):
         self.committed = True
@@ -266,3 +295,25 @@ def test_reopening_job_triggers_email_notification(monkeypatch):
 
     assert len(email_sent_mock) == 1
     assert email_sent_mock[0]["to"] == "candidato_prueba@example.com"
+
+
+def test_stored_job_cannot_be_closed_fails():
+    """Valida que una vacante que se encuentra en estado 'stored' (archivada) no pueda ser cerrada y devuelva un error 409 Conflict."""
+    job = make_job("stored")
+    db = FakeDatabase(job)
+    bg_tasks = BackgroundTasks()
+
+    with pytest.raises(HTTPException) as error:
+        jobs.close_job(
+            str(job.id),
+            bg_tasks,
+            db,
+            SimpleNamespace(id="recruiter-id", role="recruiter"),
+        )
+
+    assert error.value.status_code == 409
+    assert (
+        "archivada" in error.value.detail.lower()
+        or "stored" in error.value.detail.lower()
+    )
+    assert not db.committed

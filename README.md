@@ -96,7 +96,7 @@ plurijob/
 │   │   │   └── dependencies.py          # Inyección de dependencias (Auth JWT, DB Session).
 │   │   │
 │   │   ├── core/                  # Configuraciones Globales
-│   │   │   ├── config.py            # Lectura de variables de entorno (.env), configuración de CORS.
+│   │   │   ├── config.py            # Lectura de variables de entorno (.env), configuración de CORS, configuración de correo electrónico.
 │   │   │   ├── database.py          # Conexión a PostgreSQL (SQLAlchemy, SQLAlchemy.orm)
 │   │   │   └── security.py          # Hashing de contraseñas, creación/validación de tokens JWT, guardias de acceso según rol.
 │   │   │
@@ -211,6 +211,8 @@ Espera hasta que en la terminal aparezca el mensaje `plurijob-api INFO: Applicat
 
 ## Configuración para activar el envío de correos electrónicos
 - En el archivo `.env.example` (que se renombrará como `.env`) se encuentran las constantes que usa `email_service.py` para enviar correos, pero en formato de comentario. Si se quiere probar la función de envío de correos deben quitarse los símbolos hash (#) que acompañan a las constantes. De lo contrario, el envío de correos se simulará en la terminal.
+Las variables a las que se les debe quitar el "##" son **SMPT_HOST, SMPT_HOST, SMPT_USER, SMPT_PASSWORD, EMAILS_FROM_EMAIL, EMAILS_FROM_NAME**.
+Las variables que requieren datos reales son **SMTP_USER, SMTP_PASSWORD¨** y  **EMAILS_FROM_EMAIL**.
 El correo de Google que se use tiene que tener forzosamente la verificación en dos pasos activada, de lo contrario no podrá adquirir una "Contraseña de aplicación", que es la que se usa en las variantes de `.env`.
 
 ## Respaldo de la base de datos
@@ -232,10 +234,10 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
 
 ### Notas importantes
 - El volumen `postgres_data` asegura que los datos persistan aunque se reinicie el contenedor.
-- Si quieres reiniciar la base desde cero, usa:
+- Si quieres destruír la base de datos y volverla a crear, usa los siguientes comandos. La bandera `-v` elimina todo lo que Docker creó, pero `--build` lo reconstruye. La base de datos quedará solo con los valores predeterminados por el archivo `init_db.sql` sin considerar el respaldo de la base de datos.
   ```
   docker-compose down -v
-  docker-compose up -d
+  docker-compose up --build -d
   ```
 - Para las pruebas (y fueron muy pocas pruebas) he usado dos a tres API KEYs gratuitas proporcionadas por Google AI Studio. **No se incluirán en Accesos de prueba** porque ya excedieron el límite de consultas por día. Se recomienda crear y usar una API KEY con mayor capacidad de consultas por día.
 
@@ -250,6 +252,7 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
 - Si una persona sin registro se postula a una vacante, su CV vence en 12 meses. Al registrarse, se elimina la fecha de vencimiento del CV.
 - Un candidato tiene un límite de 3 postulaciones máximo. Esto con el fin de reducir la posibilidad de sobrecarga por peticiones en el servicio de Gemini.
 - Si el sistema se usa sin establecer un correo electrónico en .env para enviar correos, se simulará su envío en la terminal donde esté ejecutandose Docker
+- Si una vacante cerrada se reabre y había un candidato contratado/hired, se eliminará su postulación y se le enviará un correo con motivo de descarte.
 
 ## Ejecución de Pruebas
 El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el motor de matching, autenticación, procesamiento de archivos y manejo de base de datos en el backend, entre otras funciones. Para ejecutar las pruebas almacenadas en `backend/tests/` se tiene que levantar el sistema tal cual está descrito en la sección **Configurar e Instalar**. No requiere la instalación de **pytest** porque este ya está incluido en el archivo `requirements.txt` (que Docker usa para crear el contenedor).
@@ -288,7 +291,7 @@ __
 
 ## Uso de IA
 Me voy a extender más de lo que pidió:
-* Se usó Copilot Free directamente en Visual Studio Code, y Gemini versión web cuando los creditos a partir del 16/10/2026.
+* Se usó Copilot Free directamente en Visual Studio Code, y Gemini versión web.
 * En el archivo MVP declaré que hasta el 23 de septiembre me la pasé investigando y anotando ideas. Todo ese tiempo estuve estableciendo la primer versión de lo que sería el funcionamiento del motor de extracción de PDF y el motor de matching que son las partes más complejas y pesadas del sistema; a partir de eso redacté el PRD y el MVP.
 Para empezar a desarrollar el sistema usé primero a Gemini en la web. Como los únicos lenguajes que usé en el proyecto había usado eran HTML, CSS, JS y SQL, no sabía ni que usar. La estructura del arbol de carpetas, las tecnologías a usar y las primeras versiones de los motores se crearon con Gemini en web: yo redacté el pseudocódigo y las reglas de funcionamiento y la IA daba código, yo hacia pequeñas pruebas con los datos del match y los revisaba usando pgAdmin4 para conectarme a la base y veía si faltaba afinar el motor. Como evidencia está en Documentos la bitácora "Conversaciones con la IA": cuando el código se volvió muy grande como para pasarselo a Gemini empecé a discutir primero con ella la estrategia y retomando sus resultados para ordenar a Copilot que creara más código, corrigiera errores que yo todavía no ubicaba por donde salían y refinara los motores.
 * Alrededor del 16/10 comencé a leer el código, comentar las funciones e identificar los pequeños errores de lógica que se escaparon de las reglas iniciales. Estos últimos diez días me he dedicado a conocer mi código, redactar personalmente README y Manual de usuario, y agregar las correciones y adiciones que la plataforma indica apoyandome de la capacidad de programación de la IA y mi comprensión del código para encontrar errores que ni ella podría detectar porque olvida constantemente.
@@ -296,8 +299,4 @@ Para empezar a desarrollar el sistema usé primero a Gemini en la web. Como los 
 
 __
 ## Notas para la evaluación:
-- Hasta el 27/10/2026 12:36 am, al ejecutar las pruebas pasaron 86 de 86 sin errores.
-
-- Se eliminó send_template_email de email_service.py y se usó send_email en conjunto con render_template.
-
-- En los archivos subidos a plataforma se incluye una carpeta .zip con captura de pantalla de la interfaz de usuario sometida a revisión de los diferentes elementos y funciones de la página. Puede verse el uso de IA para las funciones para las que fue implementada, y pueden verse las capturas de las simulaciones de envio de correo en diferentes funciones del sistema. También se han subido dos capturas de pantalla por aparte mostrando el correo enviado y recibido. Y una foto de un mural de ideas.
+- Hasta el 28/10/2026 9:17 am, al ejecutar las pruebas pasaron 89 de 89 sin errores.

@@ -95,65 +95,6 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     return job
 
 
-## Ruta para crear una nueva vacante
-@router.post("", response_model=JobOut, status_code=status.HTTP_201_CREATED)
-def create_job(
-    payload: JobCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_recruiter),
-):
-    raw_tech = payload.technical_skills or []
-    raw_soft = payload.soft_skills or []
-
-    ensure_skills_cached(db, list(raw_tech) + list(raw_soft))
-
-    job = Job(
-        recruiter_id=current_user.id,
-        title=payload.title,
-        area=payload.area,
-        profile_type=payload.profile_type,
-        modality=payload.modality,
-        location=payload.location,
-        description=payload.description,
-        technical_skills=raw_tech,
-        soft_skills=raw_soft,
-        status=payload.status,
-        deadline=payload.deadline,
-        benefits=payload.benefits,
-    )
-
-    try:
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Error al crear la vacante.")
-
-    try:
-        job_text_with_prompt = (
-            f"{BGE_QUERY_INSTRUCTION}{job.description}" if job.description else None
-        )
-        job.embedding = generate_embedding(job_text_with_prompt)
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="La vacante se creó, pero no se pudo generar su embedding.",
-        ) from exc
-
-    try:
-        db.commit()
-        db.refresh(job)
-    except Exception as exc:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="La vacante se creó, pero no se pudo guardar su embedding.",
-        ) from exc
-
-    return job
-
-
 ## Ruta para cerrar una vacante
 @router.patch("/{job_id}/close", response_model=JobOut)
 def close_job(
@@ -165,6 +106,13 @@ def close_job(
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Vacante no encontrada")
+
+    # Validar que una vacante almacenada ('stored') no pueda cambiar de estado
+    if job.status == "stored":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede modificar una vacante que se encuentra archivada (stored).",
+        )
 
     # 1. Consultar postulaciones ANTES del commit para poder renderizar
     applications = db.query(Application).filter(Application.job_id == job.id).all()
@@ -228,7 +176,173 @@ def reopen_job(
                 detail="La nueva fecha límite debe ser posterior al momento actual.",
             )
 
-    # 1. Obtener postulaciones y renderizar templates antes de hacer commit
+    emails_to_notify = []
+
+    # 1. Buscar y eliminar la postulación en estado 'hired' si existe, encolando su respectiva notificación
+    hired_application = (
+        db.query(Application)
+        .filter(Application.job_id == job.id, Application.status == "hired")
+        .first()
+    )
+    if hired_application:
+        subject, body = render_template(
+            db,
+            "status_update",
+            {
+                "candidate_name": hired_application.candidate_email.split("@")[0],
+                "job_title": job.title,
+                "message": "Te informamos que la vacante ha sido reabierta y tu proceso como candidato contratado ha concluido.",
+                "default_subject": f"Actualización de proceso: {job.title}",
+                "default_body": f"Hola, el proceso para la vacante '{job.title}' ha sido modificado.",
+            },
+        )
+        emails_to_notify.append((hired_application.candidate_email, subject, body))
+        db.delete(hired_application)
+
+    # 2. Obtener las postulaciones restantes y renderizar templates antes de hacer commit
+    applications = db.query(Application).filter(Application.job_id == job.id).all()
+
+    for app in applications:
+        subject, body = render_template(
+            db,
+            "status_update",
+            {
+                "candidate_name": app.candidate_email.split("@")[0],
+                "job_title": job.title,
+                "message": "La vacante a la que te habías postulado ha sido reabierta. Tu proceso continúa activo.",
+                "default_subject": f"Vacante Reabierta: {job.title}",
+                "default_body": f"Hola, te informamos que la vacante '{job.title}' ha sido reabierta.",
+            },
+        )
+        emails_to_notify.append((app.candidate_email, subject, body))
+
+    # 3. Modificar y hacer commit (incluyendo la eliminación del contratado y el cambio de estado)
+    job.deadline = deadline
+    job.status = "active"
+
+    try:
+        db.commit()
+        db.refresh(job)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo reabrir la vacante.",
+        ) from exc
+
+    # 4. Encolar los correos al finalizar con éxito
+    for email, subject, body in emails_to_notify:
+        background_tasks.add_task(send_email, email, subject, body)
+
+    return job
+
+## Ruta para crear una nueva vacante
+@router.post("", response_model=JobOut, status_code=status.HTTP_201_CREATED)
+def create_job(
+    payload: JobCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_recruiter),
+):
+    raw_tech = payload.technical_skills or []
+    raw_soft = payload.soft_skills or []
+
+    ensure_skills_cached(db, list(raw_tech) + list(raw_soft))
+
+    job = Job(
+        recruiter_id=current_user.id,
+        title=payload.title,
+        area=payload.area,
+        profile_type=payload.profile_type,
+        modality=payload.modality,
+        location=payload.location,
+        description=payload.description,
+        technical_skills=raw_tech,
+        soft_skills=raw_soft,
+        status=payload.status,
+        deadline=payload.deadline,
+        benefits=payload.benefits,
+    )
+
+    try:
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Error al crear la vacante.")
+
+    try:
+        job_text_with_prompt = (
+            f"{BGE_QUERY_INSTRUCTION}{job.description}" if job.description else None
+        )
+        job.embedding = generate_embedding(job_text_with_prompt)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="La vacante se creó, pero no se pudo generar su embedding.",
+        ) from exc
+
+    try:
+        db.commit()
+        db.refresh(job)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="La vacante se creó, pero no se pudo guardar su embedding.",
+        ) from exc
+
+    return job
+
+
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Vacante no encontrada")
+
+    if job.status not in ["expired", "closed"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Solo se pueden reabrir vacantes cerradas o vencidas.",
+        )
+
+    if payload.model_fields_set - {"deadline"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Para reabrir una vacante solo se permite actualizar la fecha límite.",
+        )
+
+    deadline = payload.deadline
+    if deadline is not None:
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        if deadline <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La nueva fecha límite debe ser posterior al momento actual.",
+            )
+
+    # 1. Buscar y eliminar la postulación en estado 'hired' si existe (para liberar el slot/candidato contratado)
+    hired_application = (
+        db.query(Application)
+        .filter(Application.job_id == job.id, Application.status == "hired")
+        .first()
+    )
+    if hired_application:
+        subject, body = render_template(
+            db,
+            "application_rejected",
+            {
+                "candidate_name": Application.candidate_email.split("@")[0],
+                "job_title": Job.job_title,
+                "rejection_reason": "Motivo del rechazo: Tu periodo de prueba en la empresa terminó.",
+            },
+        )
+        db.delete(hired_application)
+        emails_to_notify.append((app.candidate_email, subject, body))
+        
+
+    # 2. Obtener las postulaciones restantes y renderizar templates antes de hacer commit
     applications = db.query(Application).filter(Application.job_id == job.id).all()
     emails_to_notify = []
 
@@ -246,7 +360,7 @@ def reopen_job(
         )
         emails_to_notify.append((app.candidate_email, subject, body))
 
-    # 2. Modificar y hacer commit
+    # 3. Modificar y hacer commit (incluyendo la eliminación del contratado y el cambio de estado)
     job.deadline = deadline
     job.status = "active"
 
@@ -260,7 +374,7 @@ def reopen_job(
             detail="No se pudo reabrir la vacante.",
         ) from exc
 
-    # 3. Encolar los correos al finalizar con éxito
+    # 4. Encolar los correos al finalizar con éxito
     for email, subject, body in emails_to_notify:
         background_tasks.add_task(send_email, email, subject, body)
 
