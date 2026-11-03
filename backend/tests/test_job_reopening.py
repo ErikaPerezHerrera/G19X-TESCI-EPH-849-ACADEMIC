@@ -1,12 +1,90 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from fastapi.testclient import TestClient
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException, BackgroundTasks
+from app.core.database import SessionLocal
+from unittest.mock import patch
 
 from app.api.v1.endpoints import jobs
 from app.schemas.job import JobReopen
+from app.models.application import Application
+
+def get_auth_token_for_user(
+    client: TestClient, email: str, role_password: str = "securepassword123"
+) -> str:
+    """Registra un usuario y retorna su token JWT de acceso."""
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": email,
+            "password": role_password,
+            "full_name": "Usuario Test",
+        },
+    )
+    res = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": email,
+            "password": role_password,
+        },
+    )
+    return res.json()["access_token"]
+
+
+def create_mock_resume_and_job(
+    client: TestClient,
+    recruiter_token: str,
+    candidate_email: str = "candidate@example.com",
+):
+    """Función de apoyo para crear un CV y una Vacante activa en la BD de pruebas."""
+    from app.models.user import User
+    from app.models.resume import Resume
+
+    db = SessionLocal()
+    try:
+        user_res = db.query(User).filter(User.email == candidate_email).first()
+        user_id = str(user_res.id) if user_res else None
+
+        resume = Resume(
+            candidate_email=candidate_email,
+            parsed_data={
+                "professional_title": "Python Developer",
+                "technical_skills": ["Python", "FastAPI"],
+                "soft_skills": ["Comunicación"],
+            },
+            user_id=user_id,
+        )
+        db.add(resume)
+        db.commit()
+        db.refresh(resume)
+        resume_id = str(resume.id)
+
+        future_deadline = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
+        with patch(
+            "app.api.v1.endpoints.jobs.generate_embedding", return_value=[0.1] * 384
+        ):
+            job_res = client.post(
+                "/api/v1/jobs",
+                headers={"Authorization": f"Bearer {recruiter_token}"},
+                json={
+                    "title": "Backend Engineer",
+                    "area": "Tecnología",
+                    "profile_type": "Senior",
+                    "modality": "remoto",
+                    "description": "Buscamos desarrollador experto en Python y FastAPI.",
+                    "technical_skills": ["Python", "FastAPI"],
+                    "soft_skills": ["Comunicación"],
+                    "status": "active",
+                    "deadline": future_deadline,
+                },
+            )
+        job_id = job_res.json()["id"]
+        return resume_id, job_id
+    finally:
+        db.close()
 
 
 class FakeQuery:
@@ -36,16 +114,6 @@ class FakeQuery:
                 body_text="Hola {{candidate_name}}, la vacante {{job_title}} ha sido actualizada. {{message}}",
             )
         if self.model == Application:
-            # Si se está buscando un candidato con status="hired"
-            for cond in self.filter_conditions:
-                # Comprobación segura para identificar si el filtro busca hired
-                if "hired" in str(cond):
-                    return SimpleNamespace(
-                        id=uuid4(),
-                        job_id=self.value.id if hasattr(self.value, "id") else uuid4(),
-                        status="hired",
-                        candidate_email="contratado@example.com",
-                    )
             return None
         return self.value
 
@@ -53,7 +121,6 @@ class FakeQuery:
         from app.models.application import Application
 
         if self.model == Application:
-            # Retornar una lista con postulaciones simuladas que tengan candidate_email
             return [
                 SimpleNamespace(
                     id=uuid4(),
@@ -115,7 +182,6 @@ def make_job(status):
         benefits=None,
         embedding=[0.4] * 384,
     )
-
 
 def test_reopening_closed_job_updates_same_record(monkeypatch):
     """Valida que al reabrir una vacante cerrada se actualice correctamente manteniendo la política de solo deadline."""
@@ -273,7 +339,6 @@ def test_reopening_job_triggers_email_notification(monkeypatch):
         email_sent_mock.append({"to": to_email, "subject": subject, "body": body_text})
         return True
 
-    # Interceptamos send_email que es el que ahora ejecuta BackgroundTasks
     monkeypatch.setattr("app.api.v1.endpoints.jobs.send_email", mock_send_email)
 
     deadline = datetime.now(timezone.utc) + timedelta(days=10)
@@ -289,7 +354,6 @@ def test_reopening_job_triggers_email_notification(monkeypatch):
     assert result.status == "active"
     assert db.committed
 
-    # Como BackgroundTasks acumula las tareas, podemos ejecutarlas manualmente para verificar el mock
     for task in bg_tasks.tasks:
         task.func(*task.args, **task.kwargs)
 
@@ -317,3 +381,55 @@ def test_stored_job_cannot_be_closed_fails():
         or "stored" in error.value.detail.lower()
     )
     assert not db.committed
+
+
+def test_reopen_job_with_hired_candidate(client):
+    recruiter_token = get_auth_token_for_user(client, "recruiter@example.com")
+    cand_email = "cand1@example.com"
+    cand_token = get_auth_token_for_user(client, cand_email)
+    resume_id, job_id = create_mock_resume_and_job(client, recruiter_token, cand_email)
+
+    # 1. Postular candidato
+    with patch(
+        "app.api.v1.endpoints.applications.recalculate_application_match",
+        return_value=None,
+    ):
+        app_res = client.post(
+            f"/api/v1/jobs/{job_id}/applications",
+            headers={"Authorization": f"Bearer {cand_token}"},
+            json={"resume_id": resume_id, "candidate_email": cand_email},
+        )
+    assert app_res.status_code == 201
+    app_id = app_res.json()["id"]
+
+    # 2. Ciclo de estados hasta hired (cierra la vacante automáticamente)
+    client.patch(
+        f"/api/v1/applications/{app_id}/view",
+        headers={"Authorization": f"Bearer {recruiter_token}"},
+    )
+    client.patch(
+        f"/api/v1/applications/{app_id}/interview",
+        headers={"Authorization": f"Bearer {recruiter_token}"},
+    )
+    hire_res = client.patch(
+        f"/api/v1/applications/{app_id}/hire",
+        headers={"Authorization": f"Bearer {recruiter_token}"},
+    )
+    assert hire_res.status_code == 200
+    assert hire_res.json()["status"] == "hired"
+
+    # 3. Reabrir la vacante y comprobar la respuesta y el envío de correos
+    sent = []
+    with patch(
+        "app.api.v1.endpoints.jobs.send_email",
+        side_effect=lambda to, s, b: sent.append(to) or True,
+    ):
+        res = client.patch(
+            f"/api/v1/jobs/{job_id}/reopen",
+            headers={"Authorization": f"Bearer {recruiter_token}"},
+            json={},
+        )
+
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "active"
+    assert sent.count(cand_email) == 1

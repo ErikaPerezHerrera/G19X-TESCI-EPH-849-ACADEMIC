@@ -211,7 +211,7 @@ Espera hasta que en la terminal aparezca el mensaje `plurijob-api INFO: Applicat
 
 ## Configuración para activar el envío de correos electrónicos
 - En el archivo `.env.example` (que se renombrará como `.env`) se encuentran las constantes que usa `email_service.py` para enviar correos, pero en formato de comentario. Si se quiere probar la función de envío de correos deben quitarse los símbolos hash (#) que acompañan a las constantes. De lo contrario, el envío de correos se simulará en la terminal.
-Las variables a las que se les debe quitar el "##" son **SMPT_HOST, SMPT_HOST, SMPT_USER, SMPT_PASSWORD, EMAILS_FROM_EMAIL, EMAILS_FROM_NAME**.
+Las variables a las que se les debe quitar el "#" son **SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, EMAILS_FROM_EMAIL, EMAILS_FROM_NAME**.
 Las variables que requieren datos reales son **SMTP_USER, SMTP_PASSWORD¨** y  **EMAILS_FROM_EMAIL**.
 El correo de Google que se use tiene que tener forzosamente la verificación en dos pasos activada, de lo contrario no podrá adquirir una "Contraseña de aplicación", que es la que se usa en las variantes de `.env`.
 
@@ -252,7 +252,7 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
 - Si una persona sin registro se postula a una vacante, su CV vence en 12 meses. Al registrarse, se elimina la fecha de vencimiento del CV.
 - Un candidato tiene un límite de 3 postulaciones máximo. Esto con el fin de reducir la posibilidad de sobrecarga por peticiones en el servicio de Gemini.
 - Si el sistema se usa sin establecer un correo electrónico en .env para enviar correos, se simulará su envío en la terminal donde esté ejecutandose Docker
-- Si una vacante cerrada se reabre y había un candidato contratado/hired, se eliminará su postulación y se le enviará un correo con motivo de descarte.
+- Si una vacante cerrada se reabre y había un candidato contratado/hired, se eliminará su postulación y se le enviará un correo notificando que su proceso de postulación ha concluido.
 
 ## Ejecución de Pruebas
 El proyecto utiliza **pytest** para garantizar el correcto funcionamiento de el motor de matching, autenticación, procesamiento de archivos y manejo de base de datos en el backend, entre otras funciones. Para ejecutar las pruebas almacenadas en `backend/tests/` se tiene que levantar el sistema tal cual está descrito en la sección **Configurar e Instalar**. No requiere la instalación de **pytest** porque este ya está incluido en el archivo `requirements.txt` (que Docker usa para crear el contenedor).
@@ -299,4 +299,4 @@ Para empezar a desarrollar el sistema usé primero a Gemini en la web. Como los 
 
 __
 ## Notas para la evaluación:
-- Hasta el 28/10/2026 9:17 am, al ejecutar las pruebas pasaron 89 de 89 sin errores.
+- Hasta el 3/11/2026 2:12 pm, al ejecutar las pruebas pasaron 90 de 90 sin errores.
