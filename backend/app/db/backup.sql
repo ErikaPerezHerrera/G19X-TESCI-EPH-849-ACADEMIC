@@ -1,3 +1,7 @@
+-- Detener la ejecución inmediatamente si ocurre cualquier error
+\set ON_ERROR_STOP on
+
+
 -- ==========================================
 -- 1. PREPARACIÓN: Desactivar protecciones
 -- ==========================================
@@ -5,13 +9,13 @@
 SET session_replication_role = 'replica';
 
 -- Desactivar triggers a la fuerza (incluyendo los de tipo ALWAYS)
-ALTER TABLE users DISABLE TRIGGER ALL;
-ALTER TABLE jobs DISABLE TRIGGER ALL;
-ALTER TABLE resumes DISABLE TRIGGER ALL;
-ALTER TABLE applications DISABLE TRIGGER ALL;
+ALTER TABLE public.users DISABLE TRIGGER ALL;
+ALTER TABLE public.jobs DISABLE TRIGGER ALL;
+ALTER TABLE public.resumes DISABLE TRIGGER ALL;
+ALTER TABLE public.applications DISABLE TRIGGER ALL;
 
 -- (Opcional pero recomendado) Vaciar tablas por si ya tenían datos
-TRUNCATE TABLE applications, resumes, jobs, users, email_templates, skills_cache RESTART IDENTITY CASCADE;
+TRUNCATE TABLE public.applications, public.resumes, public.jobs, public.users, public.email_templates, public.skills_cache RESTART IDENTITY CASCADE;
 
 --
 -- PostgreSQL database dump
@@ -215,6 +219,14 @@ SELECT pg_catalog.setval('public.email_templates_id_seq', 8, true);
 
 SELECT pg_catalog.setval('public.skills_cache_id_seq', 97, true);
 
+-- ==========================================
+-- 3. CIERRE: Reactivar todo a la normalidad
+-- ==========================================
+ALTER TABLE public.applications ENABLE TRIGGER ALL;
+ALTER TABLE public.resumes ENABLE TRIGGER ALL;
+ALTER TABLE public.jobs ENABLE TRIGGER ALL;
+ALTER TABLE public.users ENABLE TRIGGER ALL;
+SET session_replication_role = 'origin';
 
 --
 -- PostgreSQL database dump complete

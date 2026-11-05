@@ -299,4 +299,6 @@ Para empezar a desarrollar el sistema usé primero a Gemini en la web. Como los 
 
 __
 ## Notas para la evaluación:
-- Hasta el 3/11/2026 2:12 pm, al ejecutar las pruebas pasaron 90 de 90 sin errores.
+- Hasta el 5/11/2026 12:39 pm, al ejecutar las pruebas pasaron 90 de 90 sin errores.
+- Se corrigío el backup de la base de datos: no respondía bien a la activación y desactivación de triggers
+- En Documentos de la plataforma se agregó una bitácora con cambios hasta el 25 de octubre. Se estará actualizando con los cambios hechos según los cortes 5 a 8 y posteriores.

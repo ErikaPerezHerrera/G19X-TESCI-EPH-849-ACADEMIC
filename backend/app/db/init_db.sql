@@ -2,11 +2,6 @@
 \encoding UTF8
 SET session_replication_role = 'replica';
 
--- (Aquí va todo tu contenido actual de backup_datos.sql: los COPY o INSERT)
-
--- 2. Volver a activar los triggers al finalizar
-SET session_replication_role = 'origin';
-
 -- =============================================================================
 -- ESQUEMA BASE DE PluriJob
 -- PostgreSQL 16 + pgvector
@@ -374,3 +369,12 @@ USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
 
 ALTER TABLE jobs ALTER COLUMN profile_type TYPE TEXT;
+
+-- ==========================================
+-- 3. CIERRE: Reactivar todo a la normalidad
+-- ==========================================
+ALTER TABLE applications ENABLE TRIGGER ALL;
+ALTER TABLE resumes ENABLE TRIGGER ALL;
+ALTER TABLE jobs ENABLE TRIGGER ALL;
+ALTER TABLE users ENABLE TRIGGER ALL;
+SET session_replication_role = 'origin';
