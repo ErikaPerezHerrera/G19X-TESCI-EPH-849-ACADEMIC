@@ -238,7 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         return `
           <div class="col-md-6 col-lg-4 mb-4">
-            <div class="card h-100 shadow-sm border-0">
+            <div class="card h-100 border-0">
               <div class="card-body d-flex flex-column">
                 <h5 class="card-title text-primary fw-bold mb-1">${job.title}</h5>
                 <p class="text-muted small mb-2">
@@ -325,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (titleEl) titleEl.textContent = job.title || "Sin título";
     if (subtitleEl)
-      subtitleEl.textContent = `${job.area || "General"} • ${job.modality || "Presencial"}`;
+      subtitleEl.textContent = `${job.area || "General"} • ${job.modality || "Presencial"} • ${job.location || "Sin especificar"}`;
     if (descriptionEl)
       descriptionEl.textContent =
         job.description || "Sin descripción disponible.";

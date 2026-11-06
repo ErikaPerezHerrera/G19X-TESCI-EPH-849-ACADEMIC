@@ -422,7 +422,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     return `
     <div class="col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
+      <div class="card h-100 border-0">
         <div class="card-body d-flex flex-column">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <h5 class="card-title text-primary mb-0">${job.title}</h5>
@@ -888,7 +888,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return values
       .map(
         (value) =>
-          `<span class="badge text-bg-light border me-1 mb-1">${escapeHtml(value)}</span>`,
+          `<span class="badge text-bg-light border me-1 mb-1 badge-break">${escapeHtml(value)}</span>`,
       )
       .join("");
   }
@@ -986,7 +986,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     return `
-      <div class="card mb-3 shadow-sm border-0">
+      <div class="card mb-3 border-0">
         <div class="card-body">
           <div class="row align-items-center">
             <div class="col-md-4">
