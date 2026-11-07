@@ -5,6 +5,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const token = localStorage.getItem("access_token");
   const userRole = localStorage.getItem("user_role");
 
+  // Mapa de estados de postulación para etiquetas legibles
+  const STATUS_LABELS = {
+    application_received: "Recibida",
+    application_under_review: "En revisión",
+    interview_scheduled: "Entrevista programada",
+    rejected: "Descartada",
+    hired: "Contratado",
+  };
+
+   const statusLabel = (s) => STATUS_LABELS[s] || s;
+
   // Almacén local de vacantes cargadas para acceso rápido
   let currentJobs = [];
   let currentCandidateApplications = [];
@@ -998,7 +1009,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
             <div class="col-md-3 text-center">
               <span class="badge ${badgeBg} fs-6 px-3 py-2">Match: ${score}%</span>
-              <div class="small text-muted mt-1">Estado: <strong>${escapeHtml(app.status)}</strong></div>
+              <div class="small text-muted mt-1">Estado: <strong>${escapeHtml(statusLabel(app.status))}</strong></div>
             </div>
             <div class="col-md-5 text-md-end mt-3 mt-md-0">
               <!-- Botón Detalles del Match -->

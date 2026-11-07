@@ -1,8 +1,18 @@
-//# Estado de postulación, edición de CV y barra de progreso con Modales Globales
+//# Estado de postulación, edición de CV, estados de postulación y barra de progreso con Modales Globales
 import { API_BASE_URL } from "../config.js";
 
 // Variable global para almacenar las postulaciones cargadas y usarlas en el modal
 let userApplications = [];
+
+// Mapa de estados de postulación para etiquetas legibles
+const STATUS_LABELS = {
+  application_received: "Recibida",
+  application_under_review: "En revisión",
+  interview_scheduled: "Entrevista programada",
+  rejected: "Descartada",
+  hired: "Contratado",
+};
+ const statusLabel = (s) => STATUS_LABELS[s] || s;
 
 // Evitar que cargue la vista privada si se navega atrás sin token
 window.addEventListener("pageshow", (event) => {
@@ -251,7 +261,7 @@ function renderApplicationsTable(apps) {
                 ${Math.round(app.match_score || 0)}% Match
               </span>
             </td>
-            <td><span class="badge bg-primary">${escapeHtml(app.status || "Enviada")}</span></td>
+            <td><span class="badge bg-primary">${escapeHtml(statusLabel(app.status)) || "Enviada"}</span></td>
             <td class="text-end">
               <div class="d-flex flex-wrap justify-content-end gap-1">
                 <button class="btn btn-sm btn-outline-secondary view-job-btn" data-id="${escapeHtml(app.id)}">
