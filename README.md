@@ -77,7 +77,11 @@ Si bien el sistema cuenta con la ayuda de un asistente de IA que optimiza la ext
 - WSL + Docker Desktop (versión 4.92.0).
 - Python.
 - Git (opcional, y agregado a PATH para poder usar desde cualquier terminal).
-- **Tener 2GB de RAM disponibles para levantar el contenedor**.
+
+## Otros requerimientos
+- Acceso a Internet.
+- Los puertos 8000 (API) y 5500 (pantallas) deben estar libres, porque frontend/src/js/config.js apunta a 127.0.0.1:8000.
+- Tener 2GB de RAM disponibles para levantar el contenedor.
 
 ## Esquema visual de las carpetas.
 ```
@@ -156,30 +160,30 @@ plurijob/
 │   ├── public/                    # Archivos estáticos directos
 │   │   └── favicon.ico
 │   │
-│   ├── src/                       # Código Fuente
-│   │   ├── css/                   # Carpeta de archivos CSS (Estilos)
-│   │   │   ├── styles.css         # Estilos extra aplicados (actualmente solo jobs.html lo usa)
-│   │   │
-│   │   ├── js/                    # Módulos JavaScript (Consumo de API REST / Renderizado)
-│   │   │   ├── views/             # Lógica de interacción por vista
-│   │   │   │   ├── casual_user.js			# Subida de CV, filtros de búsqueda
-│   │   │   │   ├── dashboard_candidate.js	# Estado de postulación, edición de CV, subida de CV
-│   │   │   │   ├── dashboard_recruiter.js	# Filtros de búsqueda, revisión de CVs y match de las postulaciones, descarte de candidatos
-│   │   │   │   └── publish_job.js			# Publicación/reapertura de vacantes
-│   │   │   ├── auth.js            # Manejo de Tokens JWT (LocalStorage/SessionStorage), Login, Signup
-│   │   │   ├── config.js          # URLs base de API (http://localhost:8000/api/v1)
-│   │   │   └── guard.js			 # Autenticación de roles y acceso a páginas protegidas
-│   │   │
-│   │   └── pages/                 # Vistas de la aplicación
-│   │       ├── candidate/			 # Vistas de candidato
-│   │       │   ├── dashboard.html		# Vacantes Aplicadas, estadísticas, información del matching de las postulaciones
-│   │       │   └── cv_profile.html	# Información extraída del PDF
-│   │       └── recruiter/			 #Vistas de reclutador y admin
-│   │       │   ├── jobs.html			# Vacantes activas y lista de candidatos ordenados con su análisis de matching
-│   │       │   └── publish.html		# Creación de vacante
-│   │       ├── index.html         # Vista Casual / Landing de Vacantes
-│   │       ├── login.html         # Inicio de Sesión
-│   │       └── signup.html        # Registro
+│   └── src/                       # Código Fuente
+│       ├── css/                   # Carpeta de archivos CSS (Estilos)
+│       │   ├── styles.css         # Estilos extra aplicados (actualmente solo jobs.html lo usa)
+│       │
+│       ├── js/                    # Módulos JavaScript (Consumo de API REST / Renderizado)
+│       │   ├── views/             # Lógica de interacción por vista
+│       │   │   ├── casual_user.js			# Subida de CV, filtros de búsqueda
+│       │   │   ├── dashboard_candidate.js	# Estado de postulación, edición de CV, subida de CV
+│       │   │   ├── dashboard_recruiter.js	# Filtros de búsqueda, revisión de CVs y match de las postulaciones, descarte de candidatos
+│       │   │   └── publish_job.js			# Publicación/reapertura de vacantes
+│       │   ├── auth.js            # Manejo de Tokens JWT (LocalStorage/SessionStorage), Login, Signup
+│       │   ├── config.js          # URLs base de API (http://localhost:8000/api/v1)
+│       │   └── guard.js			 # Autenticación de roles y acceso a páginas protegidas
+│       │
+│       └── pages/                 # Vistas de la aplicación
+│           ├── candidate/			 # Vistas de candidato
+│           │   ├── dashboard.html		# Vacantes Aplicadas, estadísticas, información del matching de las postulaciones
+│           │   └── cv_profile.html	# Información extraída del PDF
+│           └── recruiter/			 #Vistas de reclutador y admin
+│           │   ├── jobs.html			# Vacantes activas y lista de candidatos ordenados con su análisis de matching
+│           │   └── publish.html		# Creación de vacante
+│           ├── index.html         # Vista Casual / Landing de Vacantes
+│           ├── login.html         # Inicio de Sesión
+│           └── signup.html        # Registro
 │
 ├── docker-compose.yml             # Orquestador local (PostgreSQL + pgvector, Backend, Frontend)
 ├── .gitignore                     # Exclusión de venv, __pycache__, .env, node_modules, .vscode, etcetera
@@ -194,7 +198,12 @@ plurijob/
   ```
 2. Renombra los archivos `docker-compose.yml.example` y `backend/.env.example` o créalos desde cero (quítales el .example en el nombre). 
 
-3. Copia y pega en `.env` y `docker-compose.yml` los Datos de Acceso que se encuentran en Mis Documentos > Accesos de Prueba. Y en `.env` cambia el valor de SECRET_KEY.
+3. Copia y pega en `.env` y `docker-compose.yml` los Datos de Acceso que se encuentran en Mis Documentos > Accesos de Prueba. Y en `.env` cambia el valor de SECRET_KEY. En caso de no tener los accesos de prueba a la mano se sugieren los siguientes valores:
+- **nombreContenedor**: postgres
+- **nombreBasedeDatos**: PluriJob
+- **nombreUsuarioBasedeDatos**: postgres
+- **contraseñaBasedeDatos**: (crea una contraseña de verdad)
+
 
 4. Abre Docker Desktop para que el servicio de Docker empieze a escuchar. Podrás continuar con la instalación hasta que en la barra de tareas, en el apartado de Iconos Ocultos, aparezca el icono de Docker con la leyenda "Docker Desktop Running".
 
@@ -202,11 +211,19 @@ plurijob/
   ```
   docker-compose up --build -d
   ```
-A continuación se leerá el archivo **Dockerfile** y comenzarán a descargarse los requerimientos extra descritos en **requirements.txt**. De igual forma, se buscará la base de datos Plurjob y si esta no existe, se creará de forma automática con el archivo `init_db.sql`. (No incluye la ejecución de `backup.sql`, la base de datos se inicia casí vacia con excepción de las tablas email_templates y skills_cache).
+A continuación se leerá el archivo **Dockerfile** y comenzarán a descargarse los requerimientos extra descritos en **requirements.txt** (**ATENCIÓN**: el primer arranque descarga el modelo de embeddings de fastembed, por lo que necesita internet y tarda alrededor de un minuto). De igual forma, se buscará la base de datos Plurjob y si esta no existe, se creará de forma automática con el archivo `init_db.sql`. (No incluye la ejecución de `backup.sql`, la base de datos se inicia casí vacia con excepción de las tablas email_templates y skills_cache).
 Espera hasta que en la terminal aparezca el mensaje `plurijob-api INFO: Application startup complete`.
 
 6. Copia la siguiente dirección y pégala en tu navegador para probar el sistema de forma local: 
 `http://127.0.0.1:5500/src/pages/` ó `http://localhost:5500/src/pages/`
+
+
+## Cuentas para probar
+La base arranca sin usuarios. Para probar los tres roles:
+1. **Admin:** el primer usuario que se registre en `signup.html` queda como admin.
+2. **Reclutador:** con la sesión de admin, en Vacantes usa «Crear Reclutador».
+3. **Usuario casual:** postúlate sin cuenta desde la portada.
+4. **Usuario registrado:** regístrate desde `signup.html`.
 
 
 ## Configuración para activar el envío de correos electrónicos
@@ -232,7 +249,7 @@ Para restaurar el respaldo en un contenedor nuevo ejecuta en terminal de Powersh
   ```
 **nombreContenedor**, **nombreUsuarioBasedeDatos**, **nombreBasedeDatos** y **contraseñaBasedeDatos** deben coincidir con los de los archivos `docker-compose.yml` y `backend/.env` (mismos datos de los Accesos de prueba)
 
-### Notas importantes
+## Notas importantes
 - El volumen `postgres_data` asegura que los datos persistan aunque se reinicie el contenedor.
 - Si quieres destruír la base de datos y volverla a crear, usa los siguientes comandos. La bandera `-v` elimina todo lo que Docker creó, pero `--build` lo reconstruye. La base de datos quedará solo con los valores predeterminados por el archivo `init_db.sql` sin considerar el respaldo de la base de datos.
   ```
