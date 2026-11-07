@@ -119,13 +119,14 @@ ___
 
 ### Postulación y Guardado de CV
 #### Guardado de CV y Creación de Postulación en "Buscar Vacantes"/`index.html` (Usuario Casual):
-Relacionando el proceso de extracción de información del PDF, el **Usuario Casual** puede revisar la información y editarla antes de dar click en **"Enviar postulación"**. 
+Relacionando el proceso de extracción de información del PDF, el **Usuario Casual** puede revisar la información y editarla antes de dar click en **"Enviar postulación"**. Es posible que, si la IA no estuvo disponible en la extracción de información del PDF, la información de algunos o todos los campos esté incorrecta. Se recomienda revisar cuidadosamente la información de todos los campos antes de enviar la postulación (campos: Nombre completo, Correo Electrónico, Número Telefónico, Domicilio, Título profesional o Cargo actual, Habilidades técnicas, Habilidades blandas, Experiencia Laboral, Más información).
 1. Da click en **"Enviar postulación"**. Aparecerá una advertencia que informa que si ya habia una postulación asociada al mismo correo ingresado podría afectar su visibilidad en dichas postulaciones. Puede elegir entre continuar o cancelar la postulación.
 
 2. Si da click en **"Continuar"**, el sistema se tardará un poco en mostrar un mensaje que confirme el guardado exitoso del CV o un error en el proceso de guardado. El retraso para mostrar la alerta se debe al proceso de comprobación y guardado de habilidades técnicas y blandas, y el cálculo de matching en las postulaciones relacionadas con el correo del usuario.
 
 #### Guardado de CV en "Mi CV"/`cv_profile.html` (Usuario Registrado):
-Relacionando el proceso de extracción de información del PDF y continuando con el guardado de CV, el **Usuario Registrado** puede revisar la información y editarla antes de dar click en **"Guardar cambios"**.
+Relacionando el proceso de extracción de información del PDF y continuando con el guardado de CV, el **Usuario Registrado** puede revisar la información y editarla antes de dar click en **"Guardar cambios"**. Es posible que, si la IA no estuvo disponible en la extracción de información del PDF, la información de algunos o todos los campos esté incorrecta. Se recomienda revisar cuidadosamente la información de todos los campos antes de guardar el CV (campos: Nombre completo, Correo Electrónico, Número Telefónico, Domicilio, Título profesional o Cargo actual, Habilidades técnicas, Habilidades blandas, Experiencia Laboral, Más información).
+
 1. Da click en **"Guardar cambios"**. Aparecerá una advertencia que informa que si ya habia una postulación asociada al mismo correo ingresado podría afectar su visibilidad en dichas postulaciones. Puede elegir entre continuar o cancelar la postulación.
 
 2. Si da click en **"Continuar"**, el sistema se tardará un poco en mostrar un mensaje que confirme el guardado exitoso del CV o un error en el proceso de guardado. El retraso para mostrar la alerta se debe al proceso de comprobación y guardado de habilidades técnicas y blandas, y el cálculo de matching en las postulaciones relacionadas con el correo del usuario.
@@ -291,6 +292,12 @@ ____
     **Respuesta**: No. El sistema guarda una sola versión de tu CV asociado al correo que se cargó en el CV.
 - **¿Puedo usar un archivo tipo Word o .docs para extraer su información?** 
     **Respuesta**: No. El extractor solo acepta archivos en formato PDF.
+- **¿La IA lee mi PDF?**
+    **Respuesta**: No. La aplicación cuenta con un extractor automático por reglas. Este no es infalible, por lo que se recomienda leer cuidadosamente la información extraida para evitar enviar información equivocada.
+- **¿Puedo conversar con la IA?**
+    **Respuesta**: No. Esta aplicación no cuenta con una función de prompt destinado a conversación con la IA.
+- **¿La IA revisa la compatibilidad del candidato con la vacante?**
+    **Respuesta**: No precisamente. La aplicación cuenta con un motor de matching que busca coincidencia entre habilidades técnicas (matching exacto) y coincidencia entre experiencia laboral del candidato y descripción del puesto de la vacante, entre otros aspectos. La IA realiza un análisis posterior al calculo del match para ayudar a los reclutadores a destacar características que podrían haber pasado por alto, o los candidatos pueden ver sus fortalezas y debilidades para decidir que vacantes les convienen más o cómo mejorar el contenido de su CV para volverse más atractivos para los reclutadores.
 
 ### Problemas
 #### Problemas con postulaciones
@@ -301,6 +308,14 @@ ____
 
 #### Problemas con publicación de vacantes
 - El texto de la descripción del trabajo debe tener mínimo 70 caracteres para guardarse. Esto se debe a que debe haber algo de información con la que se pueda hacer el cálculo del match.
+
+#### Problemas con las funciones de IA
+- Si la IA no está disponible puede ser por sobrecarga de peticiones a Gemini, porque se acabó la cuota o porque no hay API KEY vinculada a la aplicación.
+- Cuando las funciones con IA integrada fallen se muestra un mensaje especial para hacerlo saber a los usuarios.
+- **Extractor de texto**: En esta función la IA se usa exclusivamente para enriquecer y clasificar la información de los campos. Si la IA no está disponible el sistema usa extracción automática por reglas. Debido a la extensa variedad de formas de distribuir la información dentro de un CV es casi seguro que la información salga en campos equivocados y hasta cortada. Se recomienda encarecidamente revisar la información de todos los campos del formulario de postulacion/CV antes de enviar o guardar cualquier cambio.
+- **Redactar Vacante con IA**: Si al pedir a la IA el borrador de la vacante falla se mostrará un mensaje para avisarle. El formulario de esa sección es editable y la falta de acceso a la IA no interfiere con la publicación de la vacante.
+- **Match mediante IA**: Después de crearse una postulación, la IA proporciona un análisis y opiniones que habilitan o deshabilitan la alerta por sobrecalificación y enriquecen la experiencia de los reclutadores y candidatos. Si la IA no estuvo disponible para realizar sus funciones, no afecta al calculo de match léxico ni semántico ya que estos pertenecen al motor de matching que la aplicación ejecuta por default, pero si puede hacer que no se levante la alerta por sobrecalificación. Si un candidato detecta que la IA no participó en el análisis de su postulación puede cancelar su postulación y volver a realizarla para que nuevamente se llame a la IA (el sistema no lo realiza automaticamente, tiene que hacerlo manualmente el candidato).
+
 
 ## Notas finales
 Hasta el 26/10/2026 el sistema puede trabajar con envío de correos real o simularlo.
