@@ -774,6 +774,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       btn.addEventListener("click", async (e) => {
         const resumeId = e.currentTarget.dataset.resumeId;
         const appId = e.currentTarget.dataset.appId;
+        const jobId = e.currentTarget.dataset.jobId;
 
         // Notificar al backend que el CV ha sido visto para cambiar estado y enviar correo si aplica
         if (appId) {
@@ -789,6 +790,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         await loadCVDetail(resumeId);
         if (cvDetailModal) cvDetailModal.show();
+        if (jobId) await loadCandidates(jobId);
       });
     });
 
@@ -1014,7 +1016,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               }
 
               <!-- Botón Ver CV (Siempre disponible) -->
-              <button class="btn btn-sm btn-secondary view-cv-btn me-1" data-resume-id="${resume.id || app.resume_id}" data-app-id="${app.id}">
+              <button class="btn btn-sm btn-secondary view-cv-btn me-1" data-resume-id="${resume.id || app.resume_id}" data-app-id="${app.id}" data-job-id="${app.job_id}">
                 <i class="bi bi-file-earmark-text"></i> Ver CV
               </button>
 
