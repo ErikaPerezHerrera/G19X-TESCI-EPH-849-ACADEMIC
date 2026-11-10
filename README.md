@@ -316,6 +316,7 @@ Para empezar a desarrollar el sistema usé primero a Gemini en la web. Como los 
 
 __
 ## Notas para la evaluación:
-- Hasta el 5/11/2026 12:39 pm, al ejecutar las pruebas pasaron 90 de 90 sin errores.
-- Se corrigío el backup de la base de datos: no respondía bien a la activación y desactivación de triggers
-- En Documentos de la plataforma se agregó una bitácora con cambios hasta el 25 de octubre. Se estará actualizando con los cambios hechos según los cortes 5 a 8 y posteriores.
+- Hasta el 10/11/2026 12:10 pm, al ejecutar las pruebas pasaron 90 de 90 sin errores.
+- En Documentos de la plataforma se agregó una segunda versión de la bitácora, con cambios hasta el 7 de noviembre.
+- Se aplicaron cambios menores en los estilos del sitio web: un azul menos intenso para index.html y jobs.html, y botones de navegador más parecidos entre sí. Se aplicaron sombras a los contenedores de las tarjetas de vacantes y candidatos.
+- El Manual de Usuario se complementó con información sobre como participa la IA en el sistema.
